@@ -19,8 +19,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 可复用的页面特效库，包名 `@huberyyang/todo-fx`。首个消费方是
 [my-blog](https://github.com/HuberyYang-Space/my-blog)，首页标题的液态文字特效从那里抽出来。
 
-**当前状态：设计方案已收尾（v6），下一环节是技术选型与架构设计；工具链未初始化。** 构建工具已定 tsdown，
-移交下一环节的议题见 [`.docs/design.md`](.docs/design.md) 第十七节。工具链落地后在这里补上命令。
+**当前状态：设计方案（v6）与技术选型已收尾，下一环节是架构设计；工具链未初始化。** 选型见
+[`.docs/tech-stack.md`](.docs/tech-stack.md)，移交架构设计的议题见 [`.docs/design.md`](.docs/design.md) 第十七节。工具链落地后在这里补上命令。
 
 单包多入口，三层：
 
@@ -40,7 +40,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 动颜色的读取或解析 | [`.docs/design.md`](.docs/design.md) 第九节 | 用正则解析计算色，oklch / lab 被解析成错值 |
 | 动门控、休眠、上下文丢失，或想加离屏暂停 | [`.docs/design.md`](.docs/design.md) 第十一节 | 采用有体验风险的省资源做法，或为休眠写出状态机、上下文丢失后标题消失 |
 | 新增一个特效 | [`.docs/design.md`](.docs/design.md) 第十节 | 把门控、尺寸监听、颜色继承再复制一遍，而不是复用内核共享件 |
-| 动发版流程、CI，或让消费方接入 | [`.docs/design.md`](.docs/design.md) 第十二、十三节 | CI 里 WebGL 没开软件渲染导致测试全绿却什么都没测；或新版本被 my-blog 的发布冷却期 / `trustPolicy` 卡住 |
+| 动发版流程、CI，或让消费方接入 | [`.docs/design.md`](.docs/design.md) 第十二、十三节；[`.docs/tech-stack.md`](.docs/tech-stack.md) 第八、九节 | CI 里 WebGL 没开软件渲染导致测试全绿却什么都没测；或新版本被 my-blog 的发布冷却期 / `trustPolicy` 卡住 |
+| 新增或升级依赖、改构建 / 测试 / lint / CI 配置 | [`.docs/tech-stack.md`](.docs/tech-stack.md) | 把 TypeScript 升到 7，类型检查与 lint 全挂；或 attw 留在默认的 `warn` 级别，产物类型出错也照常构建成功 |
 
 ## 取舍原则
 
@@ -88,3 +89,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   发布之后不能再切回本地：my-blog 开着 `trustPolicy: no-downgrade`，信任级别下降的版本会被拒装。
 - **提交与 Release notes 用中文。** 提交走 `/commit`（中文）；`changelogithub.config.ts` 的分类标题配成中文，
   与提交一致。不要仿照 `todo-scripts` 改成英文提交 —— 那是它自己的取舍。英文 README 等推广到社区时再加。
+- **TypeScript 锁在 6.x，不要升到 7。** 7.0 的 npm 包不再导出编译器 API（实测 `require('typescript').createProgram`
+  为 `undefined`），vue-tsc、typescript-eslint、tsdown 生成 d.ts 都依赖它；`taze major` 提示升级时跳过。
+  等这三者都声明支持 7 再议。

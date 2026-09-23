@@ -1,6 +1,6 @@
 # 特效库方案
 
-> 2026-09-23 · v6 · **设计方案已收尾**。下一环节是技术选型与架构设计，移交的议题见第十七节
+> 2026-09-23 · v7 · **设计方案已收尾，技术选型已落定**（见 [`tech-stack.md`](tech-stack.md)）。下一环节是架构设计，移交的议题见第十七节
 > 拍板记录见 [`decisions.md`](decisions.md)（临时，制定待办清单时删除）
 > 结论：`@huberyyang/todo-fx`，单包多入口。框架无关内核 + Vue 壳；React 壳等出现第一个 React 消费方再加。
 > 首个消费方：[my-blog](https://github.com/HuberyYang-Space/my-blog)。文中实测数据均取自其提交 [`2d73f4c`](https://github.com/HuberyYang-Space/my-blog/tree/2d73f4c07366096fc899c4355088ba2c41b2c6e6)
@@ -63,10 +63,10 @@
 
 | 项 | 决定 | 理由 | 风险 |
 | :--- | :--- | :--- | :--- |
-| 形态 | 单包多入口 | 一个版本号、一次发版；`exports` 钉死边界（`./vue` 只能走公开内核 API），将来拆包是现成切割线 | 消费方 TS 若还是 `moduleResolution: node`（node10），解析不到 `./vue` 子路径的类型；由 attw 在构建时暴露 |
+| 形态 | 单包多入口 | 一个版本号、一次发版；`exports` 钉死边界（`./vue` 只能走公开内核 API），将来拆包是现成切割线 | 消费方 TS 若还是 `moduleResolution: node`（node10），解析不到 `./vue` 子路径的类型。attw 用 `esm-only` 档（v7），不检查 node10，这条改由 README 写明（要求 `bundler` 或 `node16`），见 [`tech-stack.md`](tech-stack.md) 第四节 |
 | 入口粒度 | `.` 与 `./vue` 两个入口，`sideEffects: false`（v5 默认） | 按特效拆 subpath 会让入口数随特效线性增长；ESM + 无副作用声明已能按特效 tree-shake | tree-shaking 失效时，只用 `particle-text` 的消费方白背 ogl 约 10 KB —— 阶段 0 加一条产物断言：只 import `particle-text` 的打包结果里不得出现 ogl |
 | 模块格式 | 仅 ESM（v5 默认） | 消费方都是 Vite / Nuxt；双格式要多维护一份 CJS 产物与类型 | 还在用 CJS 的工具链（老 Jest 配置）`require` 不到 |
-| `vue` | optional peerDependency，范围 `^3.5.0`（v5 默认） | 只用内核的人不被迫装 Vue；范围只写 CI 真测过的版本 | Vue 3.4 及以下的项目装包会有 peer 警告 |
+| `vue` | optional peerDependency，范围 `^3.5.0`（v5 默认，v7 确认） | 只用内核的人不被迫装 Vue；范围只写 CI 真测过的版本 —— CI 另跑一个 `vue@3.5.0` 的 job（v7，见 [`tech-stack.md`](tech-stack.md) 第九节） | Vue 3.4 及以下的项目装包会有 peer 警告 |
 | `react` | **暂不声明** | 零消费方，加 React 壳时再加 | — |
 | `ogl` | dependencies | 约 10 KB，装包即用，不必手动补 peer | 只用 `particle-text` 的消费方也会**安装** ogl（打包体积见「入口粒度」） |
 | CSS | 不发 CSS 文件 | 涂透明、canvas 定位全用 inline style，免去「还要 import 一个 css」 | inline style 优先级压过宿主 class：宿主想改 canvas 定位 / 尺寸只能 `!important` |
@@ -297,15 +297,18 @@ my-blog 现有的回退分支（拿不到 `fontBoundingBoxAscent` 时退回中�
 
 ## 十二、测试
 
+工具、版本与 project 划分见 [`tech-stack.md`](tech-stack.md) 第六节；本节定每层守什么。
+
 | 层 | 工具 | 守什么 |
 | :--- | :--- | :--- |
 | 纯计算 | vitest | `approach` 帧率无关性、粒子采样、参数表派生 |
-| 内核 + Vue 壳 | **Vitest 浏览器模式**（Playwright 驱动真浏览器，v5 默认） | shader 编译失败是静默的，单测验不出。判据：canvas `readPixels` 有非透明像素。颜色回读在 **Chromium / Firefox / WebKit** 各跑一遍第九节那张表。壳：挂载 / 卸载 / props 分派；**重渲染后 canvas 尺寸与涂透明仍在**（第六节实测表的前两行作为回归用例，先让它红一次） |
-| 集成 | Playwright 跑 playground 的宿主场景夹具 | 必需 API 缺失 → 返回 `null`；每个休眠条件**进出各一次**（`emulateMedia` 切 reduced-motion / forced-colors，窄容器折行，隐藏容器显示）并确认真文本可见、恢复后重新接管；文本变化后纹理跟上；用 `WEBGL_lose_context` 模拟上下文丢失与恢复；destroy 后 raf 与监听器归零、WebGL 上下文释放；SSR 渲染冒烟（`renderToString` 不碰 `window`） |
-| 产物 | tsdown 内置 publint + attw；自写体积断言 | `exports` 与类型解析正确；只 import `particle-text` 的打包结果里不含 ogl |
+| 内核 + Vue 壳 | **Vitest 浏览器模式**（Playwright 驱动真浏览器，v5 默认，v7 确认） | shader 编译失败是静默的，单测验不出。判据：canvas `readPixels` 有非透明像素。颜色回读在 **Chromium / Firefox / WebKit** 各跑一遍第九节那张表。壳：挂载 / 卸载 / props 分派；**重渲染后 canvas 尺寸与涂透明仍在**（第六节实测表的前两行作为回归用例，先让它红一次） |
+| 集成 | **并入 Vitest 浏览器模式**（v7）：宿主场景夹具写成模块，与 playground 共用；媒体仿真走自定义 command 调 Playwright 的 `emulateMedia` | 必需 API 缺失 → 返回 `null`；每个休眠条件**进出各一次**（`emulateMedia` 切 reduced-motion / forced-colors，窄容器折行，隐藏容器显示）并确认真文本可见、恢复后重新接管；文本变化后纹理跟上；用 `WEBGL_lose_context` 模拟上下文丢失与恢复；destroy 后 raf 与监听器归零、WebGL 上下文释放；SSR 渲染冒烟（`renderToString` 不碰 `window`） |
+| 产物 | tsdown 内置 publint + attw；自写体积断言；tsnapi 公开 API 快照（v7） | `exports` 与类型解析正确；只 import `particle-text` 的打包结果里不含 ogl；公开 API 的任何增减都要在快照 diff 里过目 |
 
 | 决定 | 理由 | 风险 |
 | :--- | :--- | :--- |
+| 集成层并入 Vitest 浏览器模式，不另起 `@playwright/test`（v7） | 只有一个测试框架、一份配置、一个 CI 步骤；夹具测试与 playground 共用同一份宿主陷阱 | 测试跑在 iframe 里：媒体仿真能否传进 iframe、`hover: none` 能否在三个内核上仿真，阶段 0 先证实（[`tech-stack.md`](tech-stack.md) 第十二节），证实不了就退回 `@playwright/test`；各测试文件的 iframe 共享 WebGL 上下文上限，浏览器测试要串行跑 |
 | 壳测试也进真浏览器，不用 happy-dom | happy-dom 没有 WebGL；第六节那类「重渲染抹掉内核写的东西」只有真 DOM 才验得准 | 测试慢于 happy-dom；CI 要装三个浏览器 |
 | CI 里 Chromium 显式开 `--enable-unsafe-swiftshader` | CI 机器没有 GPU。Chrome 从 130 起废弃「自动回退到 SwiftShader 软件渲染」，不开这个开关 WebGL 上下文会创建失败，内核测试会全部走进门控分支 —— **全绿但什么都没测** | 软件渲染与真 GPU 的像素不完全一致，像素判据只能用「有没有非透明像素」这类宽判据；阶段 0 先用已知结果的 WebGL 探针证明 CI 环境可信 |
 
@@ -317,7 +320,7 @@ v5 起按开源流程走：**基建先行，第一版发布之前，my-blog 与�
 
 | 阶段 | 内容 | 完成判据 |
 | :--- | :--- | :--- |
-| 0 | 基建（构成见下） | CI 在骨架上全绿；CI 里三个浏览器的 WebGL / Canvas 2D 已知结果探针通过；两个入口产出 d.ts，publint 与 attw 零报错；`npm publish --dry-run` 的文件清单只有 `dist` 与必要元数据 |
+| 0 | 基建（构成见下） | CI 在骨架上全绿；CI 里三个浏览器的 WebGL / Canvas 2D 已知结果探针通过；两个入口产出 d.ts，publint 与 attw 零报错；`npm publish --dry-run` 的文件清单只有 `dist` 与必要元数据；[`tech-stack.md`](tech-stack.md) 第十二节的假设全部证实（或已按其兜底方案改选型） |
 | 1 | 抽内核 + `liquid-text` | playground 的宿主场景夹具里表现与 my-blog 现状一致；第十二节内核判据过 |
 | 2 | 加 `./vue` 壳 `<LiquidText>` | 壳测试与夹具里的 Vue 页面通过 |
 | 3 | 搬 `particle-text` + `<ParticleText>` | 同上。真正的验证点：内核若在这里被迫改，说明阶段 1 抽早了 |
@@ -330,22 +333,9 @@ v5 起按开源流程走：**基建先行，第一版发布之前，my-blog 与�
 **第一版（`0.1.0`）= 完善的基建（含发版流程与 CI，参考 `todo-scripts` 的实现）+ 两个特效**（v6 定）。
 **第二个特效搬进来之前不发版** —— 只有一个用例的抽象是猜的。React 壳在出现第一个 React 消费方时启动。
 
-**基建构成**（对齐 `todo-scripts` 的现行做法与 antfu 的 starter-ts；具体版本与配置在技术选型环节落定，待办清单届时统一制定）：
-
-| 项 | 做法 | 风险 |
-| :--- | :--- | :--- |
-| 包管理 | pnpm 11，`packageManager` 字段锁版本 | pnpm 11 默认有 1 天的发布冷却期，刚发布的依赖装不上，需要时逐条豁免 |
-| 构建 | tsdown，`publint: true`、`attw: true` | 见第四节 |
-| 类型检查 | `vue-tsc --noEmit` | — |
-| lint | @antfu/eslint-config，`.vscode` 两份配置照抄其 README | — |
-| 提交规范 | `todo-scripts commitlint-init`：commitlint + husky；pre-commit 只跑 `eslint --fix` | 类型错误与测试失败要到 CI 才暴露（`todo-scripts` HB-38 的已知取舍） |
-| 测试 | 见第十二节 | 见第十二节 |
-| playground | Vite + 纯 HTML，内含宿主场景夹具（见下） | — |
-| CI | `ci.yml`：push 到 main / dev 与 PR 时跑 typecheck、lint、test、浏览器测试 | PR 期间 push 与 pull_request 各跑一次（`todo-scripts` 已知） |
-| 发版 | 本地 `pnpm release` = 全量门禁 → `bumpp --no-verify` → `npm publish`；`release.yml` 由 tag 触发，校验 tag 与版本号、重跑门禁、`changelogithub@15` 生成 Release | `npm publish` 在本地跑，包**不带 provenance**（沿用 `todo-scripts` HB-30 的取舍）。发版路径从第一版起固定：以后若改走 CI 带 provenance 发布，就不能再切回本地，否则 my-blog 的 `trustPolicy: no-downgrade` 会拒装 |
-| Release notes 语言（v6） | 提交用中文（`/commit` 规定）；`changelogithub.config.ts` 把分类标题配成中文（`🚀 新功能` / `🐞 问题修复` 等）。已实测 `changelogithub@15.0.5` dry-run：中文提交与中文标题正常生成 Release 正文 | 两句写死在源码里的英文改不了：结尾的 `View changes on GitHub`，以及没有可收录提交时的 `No significant changes`；作者署名前的 `by` 也是英文 |
-| 分支 | dev 开发 → PR → main，merge commit | — |
-| 仓库文件 | LICENSE（MIT）、中文 README、Release notes 即 changelog。英文 README 等推广到社区时再加（v6） | 推广前外部读者只有中文文档 |
+**基建构成**：对齐 `todo-scripts` 的现行做法与 antfu 的 [starter-ts](https://github.com/antfu/starter-ts)。工具、版本与关键配置已在技术选型环节落定（v7），
+连同原先列在这里的包管理、构建、lint、提交规范、CI、发版、Release notes 语言、分支、仓库文件，全部移到
+[`tech-stack.md`](tech-stack.md)。待办清单等架构设计落定后统一制定。
 
 **宿主场景夹具**：my-blog 的正式测试放在发版之后，那里暴露的问题每个都要走一次发版才能修。所以把 my-blog 已知的宿主陷阱在库里复刻成夹具，让问题在发版前就暴露：
 
@@ -373,7 +363,7 @@ v5 起按开源流程走：**基建先行，第一版发布之前，my-blog 与�
 | DOM 所有权契约靠自觉 | 类型系统拦不住壳给文字绑 style 或往挂载点里渲染子节点；靠第十二节的回归用例兜 |
 | 旧浏览器看不到特效 | Safari 18.4 / Firefox 116 / Chrome 99 以下直接显示普通文字，见第十一节 |
 | 屏幕外的实例持续渲染 | 不做离屏暂停的代价：耗电、与可见内容争帧预算，见第十一节 |
-| 新版本进 my-blog 受 CI 规则约束 | my-blog 的 CI 用 pnpm 11，默认发布冷却期 1 天 —— 不豁免的话补丁版要等一天才能装；豁免写在 my-blog 的 `minimumReleaseAgeExclude`。provenance 见第十三节「发版」 |
+| 新版本进 my-blog 受 CI 规则约束 | my-blog 的 CI 用 pnpm 11，默认发布冷却期 1 天 —— 不豁免的话补丁版要等一天才能装；豁免写在 my-blog 的 `minimumReleaseAgeExclude`。provenance 见 [`tech-stack.md`](tech-stack.md) 第八节「发版」 |
 
 ## 十五、明确不做
 
@@ -408,17 +398,19 @@ v5 起按开源流程走：**基建先行，第一版发布之前，my-blog 与�
 - **v6（形态不变）**：「不播放」分为浏览器不支持（返回 `null`）与休眠（自动恢复）；休眠条件汇成一个判定，
   reduced-motion / hover:none 改为实时响应，新增 forced-colors 与文字折行；浏览器支持定为「必需 API 清单，缺一项就回退真文本」；
   不做离屏暂停；不支持多行文字；第一版 = 完善基建 + 两个特效；中文提交与中文 Release 标题；包名定为 `@huberyyang/todo-fx`。设计方案收尾
+- **v7（形态不变）**：技术选型落定，见 [`tech-stack.md`](tech-stack.md)。pnpm 12.5.1；TypeScript 锁 6.0.3（7 没有编译器 API）；
+  集成层并入 Vitest 浏览器模式；引入 tsnapi 与 `antislop`；CI 加最低 peer 版本 job；attw 用 `esm-only` 档，node10 风险改由 README 写明；
+  第十三节「基建构成」移入 `tech-stack.md`
 
 ## 十七、待讨论（下一步）
 
-设计方案层面已无待确认项。以下议题属于下一环节，不在设计方案里定。
+设计方案与技术选型层面已无待确认项。入口粒度、模块格式、`vue` peer 范围、Vue 壳写法、壳测试方案沿用 v5 默认（v7 确认）；
+基建的版本与配置见 [`tech-stack.md`](tech-stack.md)。
 
-**移交技术选型与架构设计环节：**
+**移交架构设计环节：**
 
 | 议题 | 现状 |
 | :--- | :--- |
-| 入口粒度、模块格式、`vue` peer 范围、Vue 壳写法、壳测试方案 | 已有 v5 默认（第四、八、十二节），在技术选型环节确认 |
-| 基建的具体版本与配置 | 第十三节「基建构成」只定了做法，版本与配置在技术选型环节落定 |
 | `particle-text` 的 API 与参数表 | 按 `liquid-text` 的同一套规则推导（第六、七节），在架构设计环节落定 |
 | 内核的模块划分 | 第十节共享件的边界与文件组织，在架构设计环节落定 |
 
