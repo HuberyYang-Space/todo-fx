@@ -1,7 +1,7 @@
 # 特效库方案
 
-> 2026-09-23 · v7 · **设计方案已收尾，技术选型已落定**（见 [`tech-stack.md`](tech-stack.md)）。下一环节是架构设计，移交的议题见第十七节
-> 拍板记录见 [`decisions.md`](decisions.md)（临时，制定待办清单时删除）
+> 2026-09-23 · v8 · **设计方案、技术选型、架构设计均已落定**（见 [`tech-stack.md`](tech-stack.md)、[`architecture.md`](architecture.md)）
+> 待办清单见 [`todo.md`](todo.md)（由拍板记录统一制定，拍板记录随后删除）
 > 结论：`@huberyyang/todo-fx`，单包多入口。框架无关内核 + Vue 壳；React 壳等出现第一个 React 消费方再加。
 > 首个消费方：[my-blog](https://github.com/HuberyYang-Space/my-blog)。文中实测数据均取自其提交 [`2d73f4c`](https://github.com/HuberyYang-Space/my-blog/tree/2d73f4c07366096fc899c4355088ba2c41b2c6e6)
 >
@@ -79,8 +79,10 @@
 纯计算层   零 DOM、零 WebGL、可单测            ← hero-particles.ts / approach 原样搬
 内核层     canvas / WebGL / DOM，命令式，框架无关
            门控、纹理、raf、尺寸与文本监听、颜色继承、上下文恢复、清理
-Vue 壳     渲染真文本与空挂载点 + 生命周期 + props 分派   ← 约 30-50 行
+Vue 壳     渲染真文本与空挂载点 + 生命周期 + props 变化交给 patch   ← 约 30-50 行
 ```
+
+内核层的代码组织（运行时骨架 `defineEffect` + 共享件）见 [`architecture.md`](architecture.md)（v8）。
 
 ## 六、内核 API
 
@@ -92,17 +94,19 @@ function createLiquidText(
 ): FxInstance | null
 
 interface FxInstance {
-  patch: (o: Partial<LiquidTextOptions>) => void // uniform 热更新
-  rebuild: () => void // 重建纹理
+  patch: (o: Partial<LiquidTextOptions>) => void // 任意选项，运行时按参数表路由（v8）
   destroy: () => void
 }
 ```
 
+v8 删除了公开的 `rebuild()`：`patch` 改为接受任意选项，patch 类参数改 uniform，重建类参数由运行时自动排一次重建；
+尺寸、文本、字体、dpr 的变化内核本来就自己检测。理由与风险见 [`architecture.md`](architecture.md) 第七节。
+
 | 决定 | 理由 | 风险 |
 | :--- | :--- | :--- |
-| 只有「浏览器不支持」才返回 `null`（v6） | 调用方不写降级分支 —— 真文本一直在 DOM 里，什么都不做就是正确降级。其余不该播放的情况一律休眠，见第十一节 | 调用方分不清「不支持」和「出错」，排查「为什么没效果」只能靠 devtools |
-| 不做增量 diff 的 `update()` | 要么 patch 要么 rebuild，省掉一整套 diff 设计 | 裸用内核的人要自己查参数表决定调哪个；壳从表派生分派，不受影响 |
-| patch / rebuild 分家 | 颜色走重建要重新上传纹理，切主题闪一帧（已踩过） | — |
+| 只有「浏览器不支持」才返回 `null`（v6） | 调用方不写降级分支 —— 真文本一直在 DOM 里，什么都不做就是正确降级。其余不该播放的情况一律休眠，见第十一节 | 调用方分不清「不支持」和「出错」。v8 缓解：出错时运行时熔断并只报错一次，`debug` 参数会打印返回 `null` 的原因（[`architecture.md`](architecture.md) 第三、六节） |
+| 不做增量 diff 的 `update()` | 省掉一整套 diff 设计。v8 的 `patch` 只按键名查表路由，仍不比较新旧值 | — |
+| patch 类 / 重建类参数分家（v8 起由运行时按表路由） | 颜色走重建要重新上传纹理，切主题闪一帧（已踩过） | 每帧 patch 一个重建类参数就会每帧重建（按帧合并，最多每帧一次） |
 | **DOM 所有权：内核只碰两处** | 见下方实测 | 契约靠壳自觉，类型系统拦不住：壳给 `textEl` 绑了 style → Vue 重渲染时抹掉透明，真文本与 canvas 叠成重影；壳往 `layerEl` 里渲染了子节点 → Vue 的 children diff 可能清掉 canvas。两种都不报错 |
 | **宽度为 0 是休眠，不是门控** | 挂载在隐藏容器（标签页、`v-show`）里的实例原本会永久失效 | 休眠实例与运行实例对调用方不可区分；**首张纹理建成前绝不能涂透明**，否则文字直接隐身 |
 | **文本变化由内核自己监听**（MutationObserver） | 调用方改了文字却忘调 `rebuild`，canvas 会继续画旧字、盖在透明的新字上 —— 显示错字且不报错 | 多一个 observer；只在文本节点变化时触发，按帧合并进重建 |
@@ -121,15 +125,17 @@ interface FxInstance {
 
 所以挂载点必须是**空元素**，而不是由壳渲染 canvas 交给内核。
 
-- **patch**：`color` `accent` `strength` `chroma` `idle` `enterRadius` `wakeSpeed` `calmSpeed`
-- **rebuild**：`padding` `maxDpr` `flowmap.*`；文本 / 字号 / 字体 / 尺寸变化由内核自己检测并重建
+- **patch 类**：`color` `accent` `strength` `chroma` `idle` `enterRadius` `wakeSpeed` `calmSpeed` `debug`
+- **重建类**：`padding` `maxDpr` `flowmap.*`；文本 / 字号 / 字体 / 尺寸变化由内核自己检测并重建
 
-**每个特效一张参数表**（名称 / 类型 / 默认值 / 走 patch 还是 rebuild）。options 类型、默认值、
-壳的 props 声明与分派逻辑全部从表派生 —— 避免每加一个参数就多处手改。
+**每个特效一张参数表**（名称 / 类型 / 默认值 / 走 patch 还是重建）。options 类型、默认值、路由、
+供壳声明 props 的选项类型映射全部从表派生 —— 避免每加一个参数就多处手改。
 
 ## 七、参数表（liquid-text）
 
-从现有 const 推导，13 个。`particle-text` 的参数表在架构设计环节从 [`HeroParticles.vue`](https://github.com/HuberyYang-Space/my-blog/blob/2d73f4c07366096fc899c4355088ba2c41b2c6e6/app/components/HeroParticles.vue) 的 const 以同样方式推导。
+从现有 const 推导，13 个。v8 起 `color`、`enterRadius`、`wakeSpeed` / `calmSpeed`、`padding`、`maxDpr` 归入运行时的公共参数，
+另加公共参数 `debug`；`particle-text` 的参数表已从 [`HeroParticles.vue`](https://github.com/HuberyYang-Space/my-blog/blob/2d73f4c07366096fc899c4355088ba2c41b2c6e6/app/components/HeroParticles.vue) 的 const 以同样方式推导。
+两者都见 [`architecture.md`](architecture.md) 第六节。
 
 | 分组 | 参数 | 默认 | 走向 |
 | :--- | :--- | :--- | :--- |
@@ -167,12 +173,12 @@ span、插槽、挂载点之间不留空白，否则渲染出的空格会把光�
 
 | 职责 | 做法 | 风险 |
 | :--- | :--- | :--- |
-| 写法 | `defineComponent` + 渲染函数，由通用工厂按参数表生成组件（v5 默认） | 渲染函数下 Vue 每次重渲染都重设 style 对象（第六节实测），所以**只有根元素带 style**；换成 SFC 要加 `unplugin-vue`，d.ts 走 vue-tsc |
+| 写法 | `defineComponent` + 渲染函数，由通用工厂按公开的选项类型映射生成组件（v5 默认，v8 细化） | 渲染函数下 Vue 每次重渲染都重设 style 对象（第六节实测），所以**只有根元素带 style**；换成 SFC 要加 `unplugin-vue`，d.ts 走 vue-tsc |
 | 真文本 | `<span>{{ text }}</span>`，**不绑定任何 style**；涂透明由内核做 | 见第六节 DOM 所有权 |
 | 挂载点 | 空 `<span data-fx-layer>`，壳**绝不**往里渲染东西；空 inline 元素零尺寸，SSR 产物里不产生 CLS | 同上 |
 | 定位 | 根元素 inline `position: relative`，canvas 以它为定位基准 | 覆盖宿主 class 上的定位（`sticky` / `absolute`）；宿主要改只能外面再包一层 |
 | 生命周期 | `onMounted` → create；`onUnmounted` → destroy | — |
-| props 变化 | watch → 按参数表分派 patch 或 rebuild；`text` 不用 watch，内核自己监听 DOM 文本 | — |
+| props 变化 | watch → 直接调 `patch(changed)`，由运行时按参数表路由（v8）；`text` 不用 watch，内核自己监听 DOM 文本 | — |
 | 标签语义 | `as?: 'h1' \| 'div'`，默认 `h1`（文章页已有 h1 时传 `div`） | — |
 | 去掉外层 wrapper | 原 `HeroTitle` 是 `div.hero-title > h1`，class 透传只能落在 wrapper 上，而字号类必须挂在 h1 上 | my-blog 接入时 `.hero-title` / `.hero-title-word` 类名结构会变，[`verify-build.ts`](https://github.com/HuberyYang-Space/my-blog/blob/2d73f4c07366096fc899c4355088ba2c41b2c6e6/scripts/verify-build.ts) 的断言要同步（阶段 5 已列） |
 
@@ -217,16 +223,18 @@ Tailwind v4 的默认调色板就是 oklch —— 按开源标准，这是第一
 
 ## 十、面向增长（约束 5）
 
-特效增多的主要风险是「每个特效把同样的样板复制一遍」。内核抽出共享件，特效只写渲染逻辑：
+特效增多的主要风险是「每个特效把同样的样板复制一遍」。内核抽出共享件，特效只写渲染逻辑。
+v8 定为运行时骨架 `defineEffect` 统一装配共享件，并新增 `layer`、`text-raster`、`pointer` 三件；
+完整清单、职责与文件组织以 [`architecture.md`](architecture.md) 第二、五节为准，下表保留 v4 时的原始划分：
 
 | 共享件 | 职责 | 风险 |
 | :--- | :--- | :--- |
-| `gate` | 浏览器支持检测（必需 API 清单，见第十一节）；**所需渲染能力由特效声明**（liquid-text 要 WebGL，particle-text 只要 Canvas 2D）；休眠判定（见第十一节） | 能力要求分散在各特效里，新特效漏了声明，就会在不支持的环境里直接抛错 |
+| `gate` | 浏览器支持检测（必需 API 清单，见第十一节）；休眠判定（见第十一节）。v8 起渲染能力不再由特效声明，改由特效在 `setup` 里实际去拿上下文，拿不到就返回 `null` | 每个特效都必须在拿不到上下文时返回 `null`，忘了会让 create 抛错（响亮，不是静默） |
 | `colorProbe` | 第九节的颜色继承 | 见第九节 |
 | `rebuildWatcher` | resize + ResizeObserver + dpr 变化 + 字体加载 + 文本变化，按帧合并成一次重建 | 触发源越多越难判断「这次重建是谁触发的」；调试时需要能打印触发源 |
 | `loop` | raf 循环、dt 夹取 | — |
 | `glLifecycle` | WebGL 上下文丢失即退回真文本、恢复时重建（见第十一节）；只有 WebGL 特效用 | 见第十一节 |
-| 参数表工具 | 从表派生 options 类型、默认值、patch / rebuild 分派 | — |
+| 参数表工具 | 从表派生 options 类型、默认值、按键名路由到 patch 或重建（v8）、选项类型映射 | — |
 
 **新增一个特效 = 渲染逻辑 + 一张参数表 + 一行 Vue 壳注册**（壳写成通用工厂）。
 文字类特效共用 `textEl + layerEl` 这套 DOM 结构；出现非文字特效（背景类）时再为它定结构。
@@ -245,7 +253,7 @@ v6 把「不播放」分成两类：**浏览器不支持**（永久，返回 `nu
 
 | 必需 API | 用途 | 最低版本（MDN 兼容数据） |
 | :--- | :--- | :--- |
-| 特效声明的渲染能力（WebGL 或 Canvas 2D） | 渲染 | — |
+| 特效所需的渲染上下文（v8：由特效在 `setup` 里实际去拿，拿不到即返回 `null`） | 渲染 | — |
 | `CanvasRenderingContext2D.letterSpacing` | 纹理里的字距与 DOM 一致 | Chrome 99 / Firefox 115 / **Safari 18.4** |
 | `TextMetrics.fontBoundingBoxAscent` | 纹理里的基线与 DOM 一致 | Chrome 87 / **Firefox 116** / Safari 11.1 |
 | `ResizeObserver` | 尺寸变化重建 | Chrome 64 / Firefox 69 / Safari 13.1 |
@@ -302,7 +310,7 @@ my-blog 现有的回退分支（拿不到 `fontBoundingBoxAscent` 时退回中�
 | 层 | 工具 | 守什么 |
 | :--- | :--- | :--- |
 | 纯计算 | vitest | `approach` 帧率无关性、粒子采样、参数表派生 |
-| 内核 + Vue 壳 | **Vitest 浏览器模式**（Playwright 驱动真浏览器，v5 默认，v7 确认） | shader 编译失败是静默的，单测验不出。判据：canvas `readPixels` 有非透明像素。颜色回读在 **Chromium / Firefox / WebKit** 各跑一遍第九节那张表。壳：挂载 / 卸载 / props 分派；**重渲染后 canvas 尺寸与涂透明仍在**（第六节实测表的前两行作为回归用例，先让它红一次） |
+| 内核 + Vue 壳 | **Vitest 浏览器模式**（Playwright 驱动真浏览器，v5 默认，v7 确认） | shader 编译失败是静默的，单测验不出。判据：canvas `readPixels` 有非透明像素。颜色回读在 **Chromium / Firefox / WebKit** 各跑一遍第九节那张表。壳：挂载 / 卸载 / props 变化调到 `patch`；**重渲染后 canvas 尺寸与涂透明仍在**（第六节实测表的前两行作为回归用例，先让它红一次） |
 | 集成 | **并入 Vitest 浏览器模式**（v7）：宿主场景夹具写成模块，与 playground 共用；媒体仿真走自定义 command 调 Playwright 的 `emulateMedia` | 必需 API 缺失 → 返回 `null`；每个休眠条件**进出各一次**（`emulateMedia` 切 reduced-motion / forced-colors，窄容器折行，隐藏容器显示）并确认真文本可见、恢复后重新接管；文本变化后纹理跟上；用 `WEBGL_lose_context` 模拟上下文丢失与恢复；destroy 后 raf 与监听器归零、WebGL 上下文释放；SSR 渲染冒烟（`renderToString` 不碰 `window`） |
 | 产物 | tsdown 内置 publint + attw；自写体积断言；tsnapi 公开 API 快照（v7） | `exports` 与类型解析正确；只 import `particle-text` 的打包结果里不含 ogl；公开 API 的任何增减都要在快照 diff 里过目 |
 
@@ -323,7 +331,7 @@ v5 起按开源流程走：**基建先行，第一版发布之前，my-blog 与�
 | 0 | 基建（构成见下） | CI 在骨架上全绿；CI 里三个浏览器的 WebGL / Canvas 2D 已知结果探针通过；两个入口产出 d.ts，publint 与 attw 零报错；`npm publish --dry-run` 的文件清单只有 `dist` 与必要元数据；[`tech-stack.md`](tech-stack.md) 第十二节的假设全部证实（或已按其兜底方案改选型） |
 | 1 | 抽内核 + `liquid-text` | playground 的宿主场景夹具里表现与 my-blog 现状一致；第十二节内核判据过 |
 | 2 | 加 `./vue` 壳 `<LiquidText>` | 壳测试与夹具里的 Vue 页面通过 |
-| 3 | 搬 `particle-text` + `<ParticleText>` | 同上。真正的验证点：内核若在这里被迫改，说明阶段 1 抽早了 |
+| 3 | 搬 `particle-text` + `<ParticleText>` | 壳测试与夹具里的 Vue 页面通过；与 my-blog 的 `HeroParticles` 现状相比，只有换用共享件带来的 4 处已知差异（[`architecture.md`](architecture.md) 第六节）。真正的验证点：内核若在这里被迫改，说明阶段 1 抽早了 |
 | 4 | 发版 `0.1.0` | 本地 `pnpm release` 走完；`release.yml` 生成 GitHub Release；在一个全新空项目里从 npm 装包跑通两个入口与类型 |
 | 5 | my-blog 正式接入 | `<LiquidText>` 换掉 `HeroTitle`；typecheck + [`verify-build.ts`](https://github.com/HuberyYang-Space/my-blog/blob/2d73f4c07366096fc899c4355088ba2c41b2c6e6/scripts/verify-build.ts) 全绿（`.hero-title-word` 那条断言随结构同步改，并重新让它红一次）；my-blog 的 `minimumReleaseAgeExclude` 加上本包；[issue #1](https://github.com/HuberyYang-Space/my-blog/issues/1) 以「迁入库、删除本地副本」关闭 |
 | 6 | 验证项目接入 `<ParticleText>` | 至少一个 my-blog 之外的 Vue 项目上线 |
@@ -401,18 +409,14 @@ v5 起按开源流程走：**基建先行，第一版发布之前，my-blog 与�
 - **v7（形态不变）**：技术选型落定，见 [`tech-stack.md`](tech-stack.md)。pnpm 12.5.1；TypeScript 锁 6.0.3（7 没有编译器 API）；
   集成层并入 Vitest 浏览器模式；引入 tsnapi 与 `antislop`；CI 加最低 peer 版本 job；attw 用 `esm-only` 档，node10 风险改由 README 写明；
   第十三节「基建构成」移入 `tech-stack.md`
+- **v8（形态不变）**：架构设计落定，见 [`architecture.md`](architecture.md)。运行时骨架 `defineEffect` 统一装配共享件，
+  新增 `layer` / `text-raster` / `pointer`；渲染能力改由 `setup` 实际去拿上下文；钩子异常熔断；`patch` 按参数表路由、删除公开的 `rebuild()`；
+  公共参数由运行时定义并新增 `debug`；`particle-text` 的 API 与参数表落定；依赖方向由 lint 守
 
 ## 十七、待讨论（下一步）
 
-设计方案与技术选型层面已无待确认项。入口粒度、模块格式、`vue` peer 范围、Vue 壳写法、壳测试方案沿用 v5 默认（v7 确认）；
-基建的版本与配置见 [`tech-stack.md`](tech-stack.md)。
-
-**移交架构设计环节：**
-
-| 议题 | 现状 |
-| :--- | :--- |
-| `particle-text` 的 API 与参数表 | 按 `liquid-text` 的同一套规则推导（第六、七节），在架构设计环节落定 |
-| 内核的模块划分 | 第十节共享件的边界与文件组织，在架构设计环节落定 |
+设计方案、技术选型、架构设计均已落定，没有待确认项。版本与配置见 [`tech-stack.md`](tech-stack.md)，
+代码组织与运行时契约见 [`architecture.md`](architecture.md)。
 
 **发版后再议：**
 

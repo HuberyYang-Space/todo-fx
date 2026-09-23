@@ -11,24 +11,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **每次开工** → 先读本文件，再按 [`.docs/README.md`](.docs/README.md) 的索引连接项目上下文。
 - **每次提交** → 走 `/commit` skill，不要手写 `git add` + `git commit` 绕过去。
-- **Hubery 每拍板一项决定** → 先记入 [`.docs/decisions.md`](.docs/decisions.md)，再改方案。设计、架构、技术选型
-  全部落定之前**不设计待办清单**；落定后根据这份记录统一制定，届时删除该记录。
+- **Hubery 每拍板一项决定** → 直接写进对应文档（为什么写 [`.docs/design.md`](.docs/design.md)，用什么写
+  [`.docs/tech-stack.md`](.docs/tech-stack.md)，怎么组织写 [`.docs/architecture.md`](.docs/architecture.md)），理由与风险一起写；
+  影响待办的同步改 [`.docs/todo.md`](.docs/todo.md)。
 
 ## 项目概览
 
 可复用的页面特效库，包名 `@huberyyang/todo-fx`。首个消费方是
 [my-blog](https://github.com/HuberyYang-Space/my-blog)，首页标题的液态文字特效从那里抽出来。
 
-**当前状态：设计方案（v6）与技术选型已收尾，下一环节是架构设计；工具链未初始化。** 选型见
-[`.docs/tech-stack.md`](.docs/tech-stack.md)，移交架构设计的议题见 [`.docs/design.md`](.docs/design.md) 第十七节。工具链落地后在这里补上命令。
+**当前状态：设计方案、技术选型、架构设计均已落定，下一步是阶段 0（基建）；工具链未初始化。** 进度与各阶段任务见
+[`.docs/todo.md`](.docs/todo.md)，每个阶段开工前先写详细实现计划到 `.docs/plans/`。工具链落地后在这里补上命令。
 
 单包多入口，三层：
 
 | 层 | 入口 | 职责 |
 | :--- | :--- | :--- |
 | 纯计算 | 内部 | 零 DOM、零 WebGL，可单测 |
-| 内核 | `.` | canvas / WebGL / DOM，命令式，框架无关。`createX(textEl, layerEl, opts)` 返回 `{ patch, rebuild, destroy }` 或 `null` |
-| 框架壳 | `./vue`（`./react` 暂不做） | 渲染真文本与空挂载点 + 生命周期 + 按参数表把 props 变化分派给 patch 或 rebuild |
+| 内核 | `.` | canvas / WebGL / DOM，命令式，框架无关。`createX(textEl, layerEl, opts)` 返回 `{ patch, destroy }` 或 `null` |
+| 框架壳 | `./vue`（`./react` 暂不做） | 渲染真文本与空挂载点 + 生命周期 + 把 props 变化交给 `patch`（运行时按参数表路由） |
 
 ## 触发式索引
 
@@ -39,7 +40,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 改 Vue 壳的模板结构，或内核读写 DOM 的方式 | [`.docs/design.md`](.docs/design.md) 第六、八节 | 给文字元素绑 style、往挂载点里渲染子节点，或由壳渲染 canvas —— 重影或 canvas 塌掉，全部不报错 |
 | 动颜色的读取或解析 | [`.docs/design.md`](.docs/design.md) 第九节 | 用正则解析计算色，oklch / lab 被解析成错值 |
 | 动门控、休眠、上下文丢失，或想加离屏暂停 | [`.docs/design.md`](.docs/design.md) 第十一节 | 采用有体验风险的省资源做法，或为休眠写出状态机、上下文丢失后标题消失 |
-| 新增一个特效 | [`.docs/design.md`](.docs/design.md) 第十节 | 把门控、尺寸监听、颜色继承再复制一遍，而不是复用内核共享件 |
+| 新增一个特效 | [`.docs/architecture.md`](.docs/architecture.md) 第二、四、五节 | 把门控、尺寸监听、颜色继承再复制一遍，而不是复用内核共享件 |
+| 写或改运行时、共享件、钩子契约、参数表、导出面 | [`.docs/architecture.md`](.docs/architecture.md) | 在特效里重写休眠与涂透明的时序；让运行时长出可选钩子；壳绕过公开入口 import 内部模块 |
 | 动发版流程、CI，或让消费方接入 | [`.docs/design.md`](.docs/design.md) 第十二、十三节；[`.docs/tech-stack.md`](.docs/tech-stack.md) 第八、九节 | CI 里 WebGL 没开软件渲染导致测试全绿却什么都没测；或新版本被 my-blog 的发布冷却期 / `trustPolicy` 卡住 |
 | 新增或升级依赖、改构建 / 测试 / lint / CI 配置 | [`.docs/tech-stack.md`](.docs/tech-stack.md) | 把 TypeScript 升到 7，类型检查与 lint 全挂；或 attw 留在默认的 `warn` 级别，产物类型出错也照常构建成功 |
 
@@ -65,8 +67,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   上一个主题的值 —— 只读一次就永远停在旧主题。
 - **颜色解析交给浏览器（1×1 canvas 填色后 `getImageData` 读回），不要用正则。** 计算值不统一转成 rgb：
   实测 `oklch(0.7 0.15 200)` 被正则解析成 `0,7,0`，`lab(50 40 30)` 被解析成 `50,40,30` —— 后者看起来像对的，最难发现。
-- **颜色、强度类参数走 `patch`（改 uniform），不走 `rebuild`。** 重建要重新上传纹理，切主题会闪一帧。
-- **只有浏览器不支持才让 create 返回 `null`**（必需 API 清单或特效声明的渲染能力缺失）。太旧的浏览器直接回退
+- **颜色、强度类参数在参数表里归为 patch 类（改 uniform），不归为重建类。** 重建要重新上传纹理，切主题会闪一帧。
+- **只有浏览器不支持才让 create 返回 `null`**（必需 API 清单缺项，或特效在 `setup` 里拿不到渲染上下文）。太旧的浏览器直接回退
   真文本，**不为旧浏览器写逐个 API 的回退分支**。调用方不写降级分支 —— 真文本一直在，什么都不做就是正确降级。
 - **此刻不该播放的情况一律休眠，条件解除后自动恢复**：reduced-motion、hover:none、forced-colors、文字宽度为 0、
   文字折行、WebGL 上下文丢失。所有条件汇成**一个判定函数**，任何信号到来都重算一次；**不写状态机**，不为每个条件
@@ -78,6 +80,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **不发 CSS 文件**，涂透明与 canvas 定位全用 inline style；**不设硬编码配色默认值**，亮色主题下会看不见。
 - **shader 编译失败是静默的**：canvas 一片空白、无报错、构建照常成功。改 shader 后必须在真实浏览器里
   验证，构建和单测都证明不了它。
+- **运行时不能长成框架。** 钩子固定为 `build` / `frame` / `dispose` 加 `setup` 入口；不加可选钩子、不加生命周期事件、
+  不用类继承。一旦长出插件机制或事件总线，运行时骨架的心智负担就会反超「每个特效自己组装」，选它的理由也就不成立了。
+  钩子装不下新特效时，要么所有特效一起改契约，要么承认抽象定早了。
+- **依赖方向由 lint 守，不许为了过 lint 放宽规则或加 disable 注释。** 这些规则守的是：内核不碰框架、运行时不碰 ogl
+  （否则只用 `particle-text` 的消费方会被连带打包 ogl）、壳只走公开入口、纯计算层不碰 DOM。
 - **React 壳在出现第一个 React 消费方之前不写** —— 只被自己测试引用的代码等于零消费方。
 - **第二个特效搬进来之前不发版** —— 只有一个用例的抽象是猜的。
 
