@@ -65,6 +65,15 @@ export default defineConfig({
           },
         },
       },
+      {
+        extends: true,
+        test: {
+          name: 'dist',
+          environment: 'node',
+          include: ['test/artifact/**/*.test.ts'],
+          globalSetup: ['test/artifact/global-setup.ts'],
+        },
+      },
     ],
   },
 })

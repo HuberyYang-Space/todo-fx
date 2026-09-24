@@ -1,0 +1,9 @@
+{
+  "name": "ogl-probe",
+  "type": "module",
+  "private": true,
+  "sideEffects": false,
+  "exports": {
+    ".": "./index.js"
+  }
+}
