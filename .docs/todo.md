@@ -26,7 +26,7 @@
   `vitest-browser-vue`、`@vitejs/plugin-vue`；`typecheck` 走 `vue-tsc --noEmit`；`dist` 用 `globalSetup` 先 build，接 tsnapi —— [`tech-stack.md`](tech-stack.md) 第五、六节
 - [x] **playground**：Vite 多页纯 HTML + Vue 夹具页，alias 指向 `src`；[`design.md`](design.md) 第十三节的 8 个宿主场景夹具写成模块，
   playground 与 `browser` project 共用 —— [`tech-stack.md`](tech-stack.md) 第十节
-- [ ] **CI 与发版流程**：`ci.yml`（含浏览器安装与缓存、`vue@3.5.0` 最低 peer 版本 job）、`release.yml`、`changelogithub.config.ts`（中文标题）、
+- [x] **CI 与发版流程**：`ci.yml`（含浏览器安装与缓存、`vue@3.5.0` 最低 peer 版本 job）、`release.yml`、`changelogithub.config.ts`（中文标题）、
   `pnpm release` 门禁（`bumpp --no-verify` → `npm publish`）—— [`tech-stack.md`](tech-stack.md) 第八、九节
 - [ ] **证实 7 条假设**：[`tech-stack.md`](tech-stack.md) 第十二节逐条跑探针；`emulateMedia` 传不进 iframe 就把集成层退回 `@playwright/test`，并回头改 tech-stack
 - [ ] **守卫自证**：lint 的每条依赖方向规则、attw / publint、tsnapi、产物里没有 ogl 的断言，逐个故意违反一次，确认变红（变异后先 `cmp` 确认文件真改了）

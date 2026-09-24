@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to (re)generate a Release for, e.g. v0.1.0
+        required: true
+
+# 创建 Release 需要写权限
+permissions:
+  contents: write
+
+env:
+  # 本次发布的 tag 只有这一个来源：推送的 ref，或补发时的输入。run 步骤里一律读 $TAG，值不会被插进 shell
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # 检出 tag 本身：补发时门禁跑的是当初发布的代码，而不是默认分支的最新提交
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          # changelogithub 要完整历史才能找到上一个 tag，浅克隆会生成空的 changelog
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # 防手误：代码里还写着 0.1.9 却打了 v0.2.0，Release 正文会指向错的版本
+      - name: Verify tag matches package.json version
+        run: |
+          # 补发时漏了 v 前缀能通过下面的版本比对，之后按 tag 查找的步骤却会找不到 ref
+          case "$TAG" in
+            v*) ;;
+            *) echo "Tag $TAG must start with 'v', aborting"; exit 1 ;;
+          esac
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "${TAG#v}" != "$PKG" ]; then
+            echo "Tag $TAG does not match package.json version $PKG, aborting"
+            exit 1
+          fi
+
+      # 门禁与本地 pnpm release 同一组命令：没跑本地门禁就推上来的 tag 也到不了 Release
+      - run: pnpm exec playwright install --with-deps --only-shell chromium firefox webkit
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: xvfb-run -a pnpm test
+
+      # 锁大版本：不锁的 dlx 会让上游的破坏性更新在最要紧的时候搞挂发版
+      - name: Generate changelog and GitHub Release
+        run: pnpm dlx changelogithub@15 --to "$TAG"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

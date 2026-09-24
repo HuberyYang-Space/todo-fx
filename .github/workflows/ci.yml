@@ -1,0 +1,103 @@
+name: CI
+
+# 类型检查与测试真正跑的地方：pre-commit 只对暂存文件跑 eslint --fix。
+# push 与 pull_request 都挂：dev 上会攒好几个提交才开 PR，只挂 pull_request 的话这段时间没有任何检查
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    # ubuntu-latest 将在 2026-10-19 ~ 11-19 分批切到 26.04，换镜像会换掉软件渲染栈；钉住，让换镜像成为一次显式提交
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      # 必须在 setup-node 之前，否则 cache: pnpm 找不到 pnpm；版本由 package.json 的 packageManager 决定
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test --project unit --project dist
+      # 显式构建一次，不让下一步依赖 dist project 的 globalSetup 是否构建
+      - run: pnpm build
+      # tsdown 的 exports: true 每次构建都改写 package.json；有 diff 说明改了入口却没提交改写结果
+      - run: git diff --exit-code
+
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # 不缓存浏览器：Playwright 官方不推荐，恢复与下载耗时相当，系统依赖本来就缓存不了。
+      # --only-shell 只影响 Chromium：无头模式只用得到 headless shell
+      - run: pnpm exec playwright install --with-deps --only-shell chromium firefox webkit
+      # Firefox 在 CI 里以 headed 模式运行（headless 在 Linux 上建不出 WebGL），由 xvfb-run 提供 display
+      - run: xvfb-run -a pnpm test --project browser
+
+  min-peer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      MIN_VUE: 3.5.0
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # 只在本 job 内生效、从不提交。不能用 pnpm add -D vue@3.5.0：它只把 specifier 改成 ^3.5.0，锁定的 3.5.43 纹丝不动。
+      # @vue/compiler-dom、@vue/server-renderer 是 @vue/test-utils 的 peer，不一起钉住的话浏览器里会同时加载两套 Vue 运行时
+      - name: Pin vue to the minimum peer version
+        run: |
+          node -e "
+          const fs = require('node:fs')
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+          for (const name of ['vue', '@vue/compiler-dom', '@vue/server-renderer'])
+            pkg.devDependencies[name] = process.env.MIN_VUE
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n')
+          "
+          pnpm install --no-frozen-lockfile
+      # 防止 job 绿着、测的却是 3.5.43
+      - name: Assert the minimum peer version is what got installed
+        run: |
+          node -e "
+          for (const name of ['vue', '@vue/compiler-dom', '@vue/server-renderer']) {
+            const v = require(name + '/package.json').version
+            if (v !== process.env.MIN_VUE) {
+              console.error(name + ' = ' + v + ', expected ' + process.env.MIN_VUE)
+              process.exit(1)
+            }
+          }
+          console.log('vue, @vue/compiler-dom, @vue/server-renderer = ' + process.env.MIN_VUE)
+          "
+      # 只降 vue 时 @vue/test-utils 会带进另一套 3.5.43 的运行时，浏览器里同时加载两套 Vue
+      - name: Assert a single Vue runtime
+        run: pnpm why @vue/runtime-dom | tee /dev/stderr | grep -q 'Found 1 version of @vue/runtime-dom'
+      - run: pnpm exec playwright install --with-deps --only-shell chromium
+      - run: pnpm test --project "browser (chromium)"

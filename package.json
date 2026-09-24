@@ -45,7 +45,8 @@
     "dev": "tsdown --watch",
     "test:browser": "vitest run --project browser",
     "test:dist": "vitest run --project dist",
-    "play": "vite playground"
+    "play": "vite playground",
+    "release": "nr typecheck && nr lint && nr test && bumpp --no-verify && npm publish"
   },
   "peerDependencies": {
     "vue": "^3.5.0"
