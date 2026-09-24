@@ -17,7 +17,7 @@
   `publishConfig.access: public`、`ogl ^1.0.11` 进 dependencies、`vue ^3.5.0` 为 optional peer）；`pnpm-workspace.yaml`
   （`trustPolicy: no-downgrade`、`shellEmulator: true`）；LICENSE（MIT）；中文 README 骨架 —— [`tech-stack.md`](tech-stack.md) 第二、三、四、八节
 - [x] **TypeScript**：`typescript ^6.0.3`、`@types/node ^24.13.6`；tsconfig 对齐 starter-ts 并加 DOM lib —— [`tech-stack.md`](tech-stack.md) 第三节
-- [ ] **构建**：`tsdown` 精确锁 `0.23.0`；两个入口、`dts`、`exports: true`、`target: 'es2020'`、`platform: 'neutral'`、
+- [x] **构建**：`tsdown` 精确锁 `0.23.0`；两个入口、`dts`、`exports: true`、`target: 'es2020'`、`platform: 'neutral'`、
   `publint`、`attw: { profile: 'esm-only', level: 'error' }` —— [`tech-stack.md`](tech-stack.md) 第四节
 - [x] **lint**：`@antfu/eslint-config`（`type: 'lib'`、`vue: true`、`antislop: true`）；`.vscode` 两份配置照抄 README；
   按目录的依赖方向规则 —— [`tech-stack.md`](tech-stack.md) 第七节、[`architecture.md`](architecture.md) 第八节
