@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 可复用的页面特效库，包名 `@huberyyang/todo-fx`。首个消费方是
 [my-blog](https://github.com/HuberyYang-Space/my-blog)，首页标题的液态文字特效从那里抽出来。
 
-**当前状态：阶段 0（基建）已完成，下一步是阶段 1（运行时 + liquid-text）。** 进度与各阶段任务见
+**当前状态：阶段 0（基建）已完成，下一步是修阶段 0 的遗留问题（见 [`.docs/todo.md`](.docs/todo.md)），清零后再开阶段 1（运行时 + liquid-text）。** 进度与各阶段任务见
 [`.docs/todo.md`](.docs/todo.md)，每个阶段开工前先写详细实现计划到 [`.docs/plans/`](.docs/plans/)。
 
 | 命令 | 作用 |
