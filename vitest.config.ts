@@ -12,8 +12,9 @@ const chromiumArgs = ['--enable-unsafe-swiftshader']
 const firefoxHeadless = !process.env.CI
 
 // hover: none 只能靠 contextOptions.hasTouch 仿真，contextOptions 又只能按 instance 配，
-// 所以每个内核多一个只跑 *.touch.test.ts 的 instance。instance 级的 provider 整体覆盖父级、不合并，选项要写全
-const touchInclude = ['test/browser/**/*.touch.test.ts']
+// 所以每个内核多一个只跑 *.touch.test.ts 的 instance。instance 级的 provider 整体覆盖父级、不合并，选项要写全。
+// 已知结果探针也要在这些 instance 上跑：它们同样会测内核行为，拿不到 WebGL 时会全部走进「不支持」分支
+const touchInclude = ['test/browser/**/*.touch.test.ts', 'test/browser/env-probe.browser.test.ts']
 
 export default defineConfig({
   plugins: [vue()],
