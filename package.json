@@ -42,7 +42,8 @@
     "prepare": "husky",
     "commitlint": "commitlint --edit",
     "build": "tsdown",
-    "dev": "tsdown --watch"
+    "dev": "tsdown --watch",
+    "test:browser": "vitest run --project browser"
   },
   "peerDependencies": {
     "vue": "^3.5.0"
