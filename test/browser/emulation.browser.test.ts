@@ -14,6 +14,13 @@ describe('媒体仿真作用到测试 iframe', () => {
     expect(window.self).not.toBe(window.top)
   })
 
+  // 撤掉仿真、把宿主默认值留给下一条用例：宿主默认是 reduce 时（CI 的 Linux WebKit），
+  // 下一条开头的基线断言只有靠 setup 在用例开始前重设基线才能通过
+  it('记下宿主的默认值', async ({ annotate }) => {
+    await commands.emulateMedia({ reducedMotion: null, forcedColors: null })
+    await annotate(`宿主默认：reduce=${matches('(prefers-reduced-motion: reduce)')} forced-colors=${matches('(forced-colors: active)')}`)
+  })
+
   it('reduced-motion：进、出各一次', async () => {
     const query = '(prefers-reduced-motion: reduce)'
     const events = watch(query)
