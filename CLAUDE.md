@@ -20,8 +20,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 可复用的页面特效库，包名 `@huberyyang/todo-fx`。首个消费方是
 [my-blog](https://github.com/HuberyYang-Space/my-blog)，首页标题的液态文字特效从那里抽出来。
 
-**当前状态：设计方案、技术选型、架构设计均已落定，下一步是阶段 0（基建）；工具链未初始化。** 进度与各阶段任务见
-[`.docs/todo.md`](.docs/todo.md)，每个阶段开工前先写详细实现计划到 `.docs/plans/`。工具链落地后在这里补上命令。
+**当前状态：阶段 0（基建）已完成，下一步是阶段 1（运行时 + liquid-text）。** 进度与各阶段任务见
+[`.docs/todo.md`](.docs/todo.md)，每个阶段开工前先写详细实现计划到 [`.docs/plans/`](.docs/plans/)。
+
+| 命令 | 作用 |
+| :--- | :--- |
+| `pnpm build` | 构建 dist；publint / attw 有问题直接失败 |
+| `pnpm typecheck` | `vue-tsc --noEmit`，覆盖 `.ts` 与 `.vue` |
+| `pnpm lint` / `pnpm lint:fix` | ESLint，含依赖方向守卫 |
+| `pnpm test` | unit + browser（三内核 + 三个 touch instance）+ dist（先构建） |
+| `pnpm test:unit` / `test:browser` / `test:dist` | 单跑一个 project；只跑一个内核用 `vitest run --project 'browser (chromium)'` |
+| `pnpm play` | playground：`?fixture=<id>` 打开单个宿主场景夹具 |
 
 单包多入口，三层：
 
@@ -90,8 +99,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 工程约定
 
-- **CI 里的 Chromium 必须开 `--enable-unsafe-swiftshader`。** CI 没有 GPU，Chrome 从 130 起不再自动回退到
-  软件渲染；不开的话 WebGL 创建失败，内核测试全部走进「不支持」分支 —— 全绿，但什么都没测。
+- **CI 里的 Chromium 显式开 `--enable-unsafe-swiftshader`，但真正证明环境可信的是已知结果探针。** Playwright 1.63 已默认追加这个开关，
+  显式写是不把可信度押在上游默认值上。探针（[`test/browser/env-probe.browser.test.ts`](test/browser/env-probe.browser.test.ts)）在三个内核里
+  清屏成已知颜色再读回；不通过就说明内核测试会全部走进「不支持」分支 —— 全绿，但什么都没测。
 - **发版路径从第一版起固定**（沿用 `todo-scripts`：本地 `npm publish`，不带 provenance）。改走带 provenance 的
   发布之后不能再切回本地：my-blog 开着 `trustPolicy: no-downgrade`，信任级别下降的版本会被拒装。
 - **提交与 Release notes 用中文。** 提交走 `/commit`（中文）；`changelogithub.config.ts` 的分类标题配成中文，
@@ -99,3 +109,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **TypeScript 锁在 6.x，不要升到 7。** 7.0 的 npm 包不再导出编译器 API（实测 `require('typescript').createProgram`
   为 `undefined`），vue-tsc、typescript-eslint、tsdown 生成 d.ts 都依赖它；`taze major` 提示升级时跳过。
   等这三者都声明支持 7 再议。
+- **`vitest run -u <文件>` 会把文件路径吞成 `-u` 的值**，结果全量更新快照；要写成 `vitest run <文件> -u`。
+- **测试目录不能叫 `dist`。** antfu 默认忽略 `**/dist`，整个目录静默跳过 lint；产物测试放在 `test/artifact/`。
+- **变异实验不要走 `pnpm exec` / `pnpm run`，直接调 `node_modules/.bin/<工具>`。** pnpm 12 发现 package.json 与 node_modules 不同步时
+  会先自动 install 并改写 lockfile，改坏的依赖声明会被悄悄「修好」，结论就错了。
+- **门控读媒体查询要用新建的 `matchMedia(q).matches`，不要读被监听的那个 `MediaQueryList` 的 `.matches`。**
+  Chromium 里在 change 事件派发前读它，forced-colors 的 change 事件会被吞掉（实测），退出强制色后永远收不到恢复信号。
+- **浏览器测试里新 import 一个第三方依赖时，把它加进 browser project 的 `optimizeDeps.include`。** 没有 Vite 缓存时（CI 每次都是）
+  依赖到测试中途才被发现、临时预构建，随即整页重载，一批测试文件报 `Failed to import test file`；本地有缓存时发现不了。

@@ -9,3 +9,4 @@
 | [`architecture.md`](architecture.md) | 写或改运行时、共享件、钩子契约、参数表、导出面、依赖方向之前；新增一个特效之前 |
 | [`tech-stack.md`](tech-stack.md) | 新增或升级依赖、改构建 / 测试 / lint / CI / 发版配置之前；阶段 0 落地基建时（先看第十二节要证实的假设） |
 | [`todo.md`](todo.md) | 每次开工时看进度；每个阶段开工前先按它写详细计划到 `.docs/plans/` |
+| [`plans/`](plans/) | 执行某个阶段时；每个阶段开工前写一份，审阅通过再动手。已完成：[阶段 0](plans/2026-09-24-phase-0-infra.md) |

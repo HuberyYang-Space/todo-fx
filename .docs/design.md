@@ -1,6 +1,6 @@
 # 特效库方案
 
-> 2026-09-23 · v8 · **设计方案、技术选型、架构设计均已落定**（见 [`tech-stack.md`](tech-stack.md)、[`architecture.md`](architecture.md)）
+> 2026-09-24 · v9 · **设计方案、技术选型、架构设计均已落定，阶段 0（基建）已完成**（见 [`tech-stack.md`](tech-stack.md)、[`architecture.md`](architecture.md)）
 > 待办清单见 [`todo.md`](todo.md)（由拍板记录统一制定，拍板记录随后删除）
 > 结论：`@huberyyang/todo-fx`，单包多入口。框架无关内核 + Vue 壳；React 壳等出现第一个 React 消费方再加。
 > 首个消费方：[my-blog](https://github.com/HuberyYang-Space/my-blog)。文中实测数据均取自其提交 [`2d73f4c`](https://github.com/HuberyYang-Space/my-blog/tree/2d73f4c07366096fc899c4355088ba2c41b2c6e6)
@@ -63,7 +63,7 @@
 
 | 项 | 决定 | 理由 | 风险 |
 | :--- | :--- | :--- | :--- |
-| 形态 | 单包多入口 | 一个版本号、一次发版；`exports` 钉死边界（`./vue` 只能走公开内核 API），将来拆包是现成切割线 | 消费方 TS 若还是 `moduleResolution: node`（node10），解析不到 `./vue` 子路径的类型。attw 用 `esm-only` 档（v7），不检查 node10，这条改由 README 写明（要求 `bundler` 或 `node16`），见 [`tech-stack.md`](tech-stack.md) 第四节 |
+| 形态 | 单包多入口 | 一个版本号、一次发版；`exports` 钉死边界（`./vue` 只能走公开内核 API），将来拆包是现成切割线 | 消费方 TS 若还是 `moduleResolution: node`（node10），连根入口 `.` 的类型都解析不到（纯 ESM 下不写 `main` / `types`，v9 实测），不只是 `./vue` 子路径。attw 用 `esm-only` 档（v7），不检查 node10，这条改由 README 写明（要求 `bundler` 或 `node16`），见 [`tech-stack.md`](tech-stack.md) 第四节 |
 | 入口粒度 | `.` 与 `./vue` 两个入口，`sideEffects: false`（v5 默认） | 按特效拆 subpath 会让入口数随特效线性增长；ESM + 无副作用声明已能按特效 tree-shake | tree-shaking 失效时，只用 `particle-text` 的消费方白背 ogl 约 10 KB —— 阶段 0 加一条产物断言：只 import `particle-text` 的打包结果里不得出现 ogl |
 | 模块格式 | 仅 ESM（v5 默认） | 消费方都是 Vite / Nuxt；双格式要多维护一份 CJS 产物与类型 | 还在用 CJS 的工具链（老 Jest 配置）`require` 不到 |
 | `vue` | optional peerDependency，范围 `^3.5.0`（v5 默认，v7 确认） | 只用内核的人不被迫装 Vue；范围只写 CI 真测过的版本 —— CI 另跑一个 `vue@3.5.0` 的 job（v7，见 [`tech-stack.md`](tech-stack.md) 第九节） | Vue 3.4 及以下的项目装包会有 peer 警告 |
@@ -211,7 +211,7 @@ Tailwind v4 的默认调色板就是 oklch —— 按开源标准，这是第一
 | :--- | :--- | :--- |
 | 库不认识任何变量名 | `--c-primary` 是调用方传进来的字符串，对宿主零假设 | — |
 | 每帧读而非只读一次 | 主题切换只改 html 的 class，颜色带过渡，读一次会永远停在旧主题 | 有脏样式时每帧强制一次样式重算，与现状同量级（实测约 1μs / 帧） |
-| canvas 回读转 sRGB | 浏览器负责所有色彩空间转换，CSS 以后加新语法也不用跟 | 广色域被裁到 sRGB：实测 `color(display-p3 1 0 0)` 回读成 `255,0,0`，P3 屏上特效文字会比 DOM 文字略灰。**只在 Chromium 实测过**，Firefox / WebKit 在阶段 0 的 CI 里补测 |
+| canvas 回读转 sRGB | 浏览器负责所有色彩空间转换，CSS 以后加新语法也不用跟 | 广色域被裁到 sRGB：实测 `color(display-p3 1 0 0)` 回读成 `255,0,0`（三内核一致），P3 屏上特效文字会比 DOM 文字略灰。上表的计算值与回读值 v9 在 Chromium / Firefox / WebKit 上实测一致（macOS 与 CI 的 Linux 各跑一遍，见 `test/browser/host-fixtures.browser.test.ts` 的 modern-colors 自检） |
 | 颜色自带的 alpha 乘进最终 alpha | 宿主常用半透明色做「淡一档」的文字，忽略 alpha 会比 DOM 文字更深 | — |
 
 **考虑过、没采用的替代方案：**
@@ -316,9 +316,9 @@ my-blog 现有的回退分支（拿不到 `fontBoundingBoxAscent` 时退回中�
 
 | 决定 | 理由 | 风险 |
 | :--- | :--- | :--- |
-| 集成层并入 Vitest 浏览器模式，不另起 `@playwright/test`（v7） | 只有一个测试框架、一份配置、一个 CI 步骤；夹具测试与 playground 共用同一份宿主陷阱 | 测试跑在 iframe 里：媒体仿真能否传进 iframe、`hover: none` 能否在三个内核上仿真，阶段 0 先证实（[`tech-stack.md`](tech-stack.md) 第十二节），证实不了就退回 `@playwright/test`；各测试文件的 iframe 共享 WebGL 上下文上限，浏览器测试要串行跑 |
+| 集成层并入 Vitest 浏览器模式，不另起 `@playwright/test`（v7） | 只有一个测试框架、一份配置、一个 CI 步骤；夹具测试与 playground 共用同一份宿主陷阱 | 测试跑在 iframe 里：媒体仿真能传进 iframe、三内核都能仿真出 `hover: none`，v9 已证实（[`tech-stack.md`](tech-stack.md) 第十二节）。仿真会跨用例残留、不仿真时的基线又取决于宿主系统（CI 的 Linux WebKit 默认 reduced-motion），由 setup 在每条用例前设回同一基线。原先「各测试文件共享 WebGL 上下文上限、要串行跑」的判断已证伪（并行时每个文件有独立的页面） |
 | 壳测试也进真浏览器，不用 happy-dom | happy-dom 没有 WebGL；第六节那类「重渲染抹掉内核写的东西」只有真 DOM 才验得准 | 测试慢于 happy-dom；CI 要装三个浏览器 |
-| CI 里 Chromium 显式开 `--enable-unsafe-swiftshader` | CI 机器没有 GPU。Chrome 从 130 起废弃「自动回退到 SwiftShader 软件渲染」，不开这个开关 WebGL 上下文会创建失败，内核测试会全部走进门控分支 —— **全绿但什么都没测** | 软件渲染与真 GPU 的像素不完全一致，像素判据只能用「有没有非透明像素」这类宽判据；阶段 0 先用已知结果的 WebGL 探针证明 CI 环境可信 |
+| CI 里 Chromium 显式开 `--enable-unsafe-swiftshader` | CI 机器没有 GPU。Chrome 从 130 起废弃「自动回退到 SwiftShader 软件渲染」；Playwright 1.63 已默认追加这个开关（v9 实测），显式写上是不把可信度押在上游默认值上。环境可信由三内核的已知结果探针证明，否则内核测试会全部走进门控分支 —— **全绿但什么都没测** | 软件渲染与真 GPU 的像素不完全一致，像素判据只能用「有没有非透明像素」这类宽判据，或只用 k/255 能整除的颜色（0.7 这类值在 SwiftShader 与 GPU 上取整不同）。Firefox 在 Linux 上 headless 建不出 WebGL，CI 里以 headed 模式跑在 xvfb 里 |
 
 纪律：每个守卫写完故意破坏一次确认变红；变异后先 `cmp` 确认文件真改了再读结果；布局类判据一律挪到真浏览器。
 
@@ -412,6 +412,8 @@ v5 起按开源流程走：**基建先行，第一版发布之前，my-blog 与�
 - **v8（形态不变）**：架构设计落定，见 [`architecture.md`](architecture.md)。运行时骨架 `defineEffect` 统一装配共享件，
   新增 `layer` / `text-raster` / `pointer`；渲染能力改由 `setup` 实际去拿上下文；钩子异常熔断；`patch` 按参数表路由、删除公开的 `rebuild()`；
   公共参数由运行时定义并新增 `debug`；`particle-text` 的 API 与参数表落定；依赖方向由 lint 守
+- **v9（形态不变）**：阶段 0 落地。浏览器测试不再强制串行；依赖方向规则补齐为九条；ogl 产物判据改为不压缩产物里的 region 注释 + 对照测试；
+  媒体仿真的基线由 setup 显式设定；node10 解析不到的范围扩大到两个入口
 
 ## 十七、待讨论（下一步）
 

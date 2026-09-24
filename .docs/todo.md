@@ -26,10 +26,12 @@
   `vitest-browser-vue`、`@vitejs/plugin-vue`；`typecheck` 走 `vue-tsc --noEmit`；`dist` 用 `globalSetup` 先 build，接 tsnapi —— [`tech-stack.md`](tech-stack.md) 第五、六节
 - [x] **playground**：Vite 多页纯 HTML + Vue 夹具页，alias 指向 `src`；[`design.md`](design.md) 第十三节的 8 个宿主场景夹具写成模块，
   playground 与 `browser` project 共用 —— [`tech-stack.md`](tech-stack.md) 第十节
-- [x] **CI 与发版流程**：`ci.yml`（含浏览器安装与缓存、`vue@3.5.0` 最低 peer 版本 job）、`release.yml`、`changelogithub.config.ts`（中文标题）、
+- [x] **CI 与发版流程**：`ci.yml`（含浏览器安装（不缓存，见 tech-stack 第九节）、`vue@3.5.0` 最低 peer 版本 job）、`release.yml`、`changelogithub.config.ts`（中文标题）、
   `pnpm release` 门禁（`bumpp --no-verify` → `npm publish`）—— [`tech-stack.md`](tech-stack.md) 第八、九节
-- [ ] **证实 7 条假设**：[`tech-stack.md`](tech-stack.md) 第十二节逐条跑探针；`emulateMedia` 传不进 iframe 就把集成层退回 `@playwright/test`，并回头改 tech-stack
-- [ ] **守卫自证**：lint 的每条依赖方向规则、attw / publint、tsnapi、产物里没有 ogl 的断言，逐个故意违反一次，确认变红（变异后先 `cmp` 确认文件真改了）
+- [x] **证实 7 条假设**：[`tech-stack.md`](tech-stack.md) 第十二节逐条跑探针；`emulateMedia` 传不进 iframe 就把集成层退回 `@playwright/test`，并回头改 tech-stack
+- [x] **守卫自证**：lint 的每条依赖方向规则、attw / publint、tsnapi、产物里没有 ogl 的断言，逐个故意违反一次，确认变红（变异后先 `cmp` 确认文件真改了）
+
+阶段 0 于 2026-09-24 完成，实现计划与执行记录见 [`plans/2026-09-24-phase-0-infra.md`](plans/2026-09-24-phase-0-infra.md)；CI 全绿见 run 35948298490。
 
 完成判据：CI 在骨架上全绿；三个内核的 WebGL / Canvas 2D 已知结果探针通过；两个入口产出 d.ts，publint 与 attw 零报错；
 `npm publish --dry-run` 的文件清单只有 `dist` 与必要元数据；第十二节的假设全部证实（或已按兜底方案改选型）。
@@ -48,6 +50,12 @@
 - [ ] **不迁 `hero-title.test.ts`**：它读源码与样式表文本，断言了规则存在，却没断言规则作用在谁身上；由宿主场景夹具里的行为测试取代
   （reset 压画布、颜色过渡停在旧主题）
 
+阶段 0 留下的注意事项：
+- **门控**：媒体查询的当前状态读新建的 `matchMedia(q).matches`（见 [`architecture.md`](architecture.md) 第五节 `gate`）。
+- **测试基线**：`test/browser/setup.ts` 在每条用例前把媒体仿真设回 `no-preference` / `none`；测休眠条件时显式仿真，不要依赖宿主默认值（CI 的 Linux WebKit 默认就是 reduced-motion）。
+- **产物断言**：`test/artifact/no-ogl.test.ts` 加真实入口的对照：`import createLiquidText` 的打包结果里必须有 ogl（ogl 被误打进 dist 时，唯一会红的就是它）。
+- **playground**：`playground/main.ts` 对夹具的每个 `targets` 调 `createLiquidText`；alias 已指向 `src`。
+
 完成判据：playground 的宿主场景夹具里表现与 my-blog 现状一致；[`design.md`](design.md) 第十二节的内核判据通过。
 
 ## 阶段 2：Vue 壳 `<LiquidText>`
@@ -59,6 +67,14 @@
 - [ ] **SSR 冒烟**：`renderToString` 不碰 `window`
 - [ ] **公开入口 `./vue`**：只导出 `LiquidText`（阶段 3 再加 `ParticleText`）
 
+阶段 0 在隔离目录实测得出的写法约束：
+- **工厂写法**：公开签名 `<T extends OptionTypes>(name, optionTypes: T): FxComponent<T>`，实现签名不带泛型、返回类型写 `Component`
+  （泛型直接流进 `defineComponent` 会让 setup 里的 `props.as` 取不到；实现签名写成带 props 的 `DefineComponent` 会把 setup 里的 props 推成 any）。
+  工厂函数加 `/* @__NO_SIDE_EFFECTS__ */`，否则只用 `ParticleText` 的消费方也会带上 ogl（实测 26.8 KB）。
+- **模板类型夹具**：用 `<!-- @vue-expect-error 说明 -->`；每行错误用法只比正确用法多改一个属性（否则 expect-error 被别的错误用掉，守卫变瞎）；
+  另配一条 SSR 测试断言选项确实注册成了 props（类型夹具管不到运行时）。
+- **Vue 夹具页**：`playground/vue/App.vue` 目前按壳的结构手写，换成 `<LiquidText>` 后 `test/browser/vue-fixture.browser.test.ts` 跟着改。
+
 完成判据：壳测试与夹具里的 Vue 页面通过。
 
 ## 阶段 3：`particle-text` + `<ParticleText>`
@@ -66,7 +82,8 @@
 - [ ] **纯计算**：`particles` 由 my-blog 的 `hero-particles.ts` 原样搬入，连同 `hero-particles.test.ts`
 - [ ] **特效**：参数表（7 个独有参数 + 公共参数，`calmSpeed` 覆盖为 `2.6`，阻尼按固定阻尼比推出）；粒子版自身逻辑不改 —— [`architecture.md`](architecture.md) 第六节
 - [ ] **壳与导出**：`<ParticleText>`、`createParticleText`、`particleTextOptionTypes`；更新 tsnapi 快照
-- [ ] **产物断言转实**：只 import `particle-text` 的打包结果里没有 ogl
+- [ ] **产物断言转实**：加主断言 —— 只 import `createParticleText` / `ParticleText` 的打包结果里没有 ogl；然后删掉探针包
+  `test/artifact/fixtures/ogl-probe/` 及其两条用例（真实入口已覆盖同样的判据）
 - [ ] **内核被迫改动的记录**：这里若要改运行时，说明阶段 1 抽早了；改动与原因记进 [`architecture.md`](architecture.md)
 
 完成判据：壳测试与夹具通过；与 `HeroParticles` 现状相比只有 4 处已知差异（[`architecture.md`](architecture.md) 第六节）。

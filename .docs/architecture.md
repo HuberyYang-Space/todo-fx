@@ -1,6 +1,7 @@
 # 架构设计
 
 > 2026-09-23 · **架构设计已落定**。设计方案见 [`design.md`](design.md)，技术选型见 [`tech-stack.md`](tech-stack.md)
+> 2026-09-24 · 阶段 0 落地：第五节 `gate` 补媒体查询的读法，第八节补齐依赖方向规则
 > 这里定的是**代码怎么组织、运行时怎么调度特效、对外暴露什么**。文中的类型签名是契约，不是最终代码。
 >
 > 写法约定同 [`design.md`](design.md)：每条决定都写风险。
@@ -120,7 +121,7 @@ interface FrameState {
 | 共享件 | 层 | 职责 | 风险 |
 | :--- | :--- | :--- | :--- |
 | `define-effect` | 运行时 | 运行时本体：装配下面各件，独占第三节的全部时序 | 见第二节 |
-| `gate` | 运行时 | 必需 API 清单检测（[`design.md`](design.md) 第十一节）；休眠判定函数及其信号：`prefers-reduced-motion`、`hover: none`、`forced-colors` 三个媒体查询，文字宽度为 0，文字折行，上下文丢失 | 折行判定用 `textEl.getClientRects()` 多于一个矩形，只在 `textEl` 是 inline 元素时成立 —— 壳渲染的正是 inline span；裸用内核的人要在类型注释里看到这条要求 |
+| `gate` | 运行时 | 必需 API 清单检测（[`design.md`](design.md) 第十一节）；休眠判定函数及其信号：`prefers-reduced-motion`、`hover: none`、`forced-colors` 三个媒体查询，文字宽度为 0，文字折行，上下文丢失 | 折行判定用 `textEl.getClientRects()` 多于一个矩形，只在 `textEl` 是 inline 元素时成立 —— 壳渲染的正是 inline span；裸用内核的人要在类型注释里看到这条要求。媒体查询的当前状态要读新建的 `matchMedia(q).matches`，被监听的 `MediaQueryList` 只当信号源：Chromium 里在 change 事件派发前读它的 `.matches`，forced-colors 的 change 事件会被吞掉（阶段 0 实测），退出强制色后收不到恢复信号 |
 | `layer` | 运行时 | 在挂载点里建 canvas；负责尺寸（文字外框加四周 `padding`）、dpr、按实测偏移定位（相对 canvas 的 offsetParent）；inline 写 `max-width: none`、`pointer-events: none`、`aria-hidden` | 定位基准要求壳的根元素有定位上下文（壳设 inline `position: relative`，见 [`design.md`](design.md) 第八节）；裸用内核的人要自己提供 |
 | `text-raster` | 运行时 | 把 DOM 文字画进离屏 canvas 并与 DOM 精确对齐：字体、`letterSpacing`、按 `fontBoundingBoxAscent` 定基线、dpr、padding。以 `HeroTitle` 修好的写法为准 | 只画一行（折行由 `gate` 负责休眠） |
 | `color-probe` | 运行时 | [`design.md`](design.md) 第九节的颜色继承与 canvas 回读。参数表里类型为颜色的参数，每帧解析一次，放进 `FrameState.colors` | 见第九节 |
@@ -209,10 +210,18 @@ Vue 壳的 props = `text` + `as` + 选项类型映射；props 变化时直接调
 | `runtime/` | import `ogl` | 只用 `particle-text` 的消费方不被运行时连带打包 ogl；与 `dist` 测试的产物断言互为双保险 |
 | `effects/*` | 特效之间互相 import | 特效之间只通过运行时共享 |
 | `vue/` | import 公开入口以外的任何内部路径 | 壳只能走公开内核 API |
+| `runtime/` | import `effects/`、`vue/`、`index.ts` | runtime 借 `../effects/liquid-text` 就能把 ogl 间接拉进来，「runtime 不碰 ogl」会被绕开 |
+| `effects/*` | import `vue/`、`index.ts` | 依赖方向只有一条路（第一节） |
+| `index.ts` | import 框架；引用 `./vue` | 公开入口 `.` 不能把壳带进来 |
+| `compute/`、`runtime/`、`effects/*`、`index.ts` | 经由包名 `@huberyyang/todo-fx` 自引用 | 自引用绕过分层，把整个公开入口拉进来 |
+
+后四条是阶段 0 落地时补上的：它们就是第一节「依赖方向只有一条路」的字面落地。九条规则写在 [`eslint.config.ts`](../eslint.config.ts)，
+由 [`test/unit/eslint-guards.test.ts`](../test/unit/eslint-guards.test.ts) 对每条同时守住「拦住」与「放行」两面。
 
 | 决定 | 理由 | 风险 |
 | :--- | :--- | :--- |
-| 用 lint 守依赖方向，不拆出不含 DOM 类型的 tsconfig | 拆 tsconfig 要多跑一个类型检查工程，收益只是多拦住类型引用 | `no-restricted-globals` 只拦标识符，拦不住 `HTMLCanvasElement` 这类类型引用；这些规则都是守卫型，写错也照样全绿，落地时每条都要故意违反一次、确认变红 |
+| 用 lint 守依赖方向，不拆出不含 DOM 类型的 tsconfig | 拆 tsconfig 要多跑一个类型检查工程，收益只是多拦住类型引用 | `no-restricted-globals` 只拦标识符，拦不住 `HTMLCanvasElement` 这类类型引用；动态 `import()` 与 `globalThis.document` 也拦不住。这些规则都是守卫型，写错也照样全绿，阶段 0 已逐条故意违反、确认变红 |
+| 每个目录只写一个配置项，把该目录的全部禁令拼进同一条 `no-restricted-imports` | 同一文件命中多个配置项时，后一项的规则选项整体覆盖前一项、不合并：实测把 runtime 的 ogl 禁令拆成单独一项，另外 11 条守卫静默失效 | 新增禁令时必须加进该目录已有的那一项；路径按目录深度写，特效子目录再深一层会被误报（响亮地红），届时改规则、不要放宽 |
 
 ## 九、测试落点
 
