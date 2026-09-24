@@ -52,7 +52,7 @@
 
 阶段 0 留下的注意事项：
 - **门控**：媒体查询的当前状态读新建的 `matchMedia(q).matches`（见 [`architecture.md`](architecture.md) 第五节 `gate`）。
-- **测试基线**：`test/browser/setup.ts` 在每条用例前把媒体仿真设回 `no-preference` / `none`；测休眠条件时显式仿真，不要依赖宿主默认值（CI 的 Linux WebKit 默认就是 reduced-motion）。
+- **测试基线**：`test/browser/setup.ts` 在每个测试文件与每条用例开始前把媒体仿真设回 `no-preference` / `none`；测休眠条件时显式仿真，不要依赖宿主默认值（CI 的 Linux WebKit 默认就是 reduced-motion）。
 - **产物断言**：`test/artifact/no-ogl.test.ts` 加真实入口的对照：`import createLiquidText` 的打包结果里必须有 ogl（ogl 被误打进 dist 时，唯一会红的就是它）。
 - **playground**：`playground/main.ts` 对夹具的每个 `targets` 调 `createLiquidText`；alias 已指向 `src`。
 

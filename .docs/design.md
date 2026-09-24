@@ -316,9 +316,9 @@ my-blog 现有的回退分支（拿不到 `fontBoundingBoxAscent` 时退回中�
 
 | 决定 | 理由 | 风险 |
 | :--- | :--- | :--- |
-| 集成层并入 Vitest 浏览器模式，不另起 `@playwright/test`（v7） | 只有一个测试框架、一份配置、一个 CI 步骤；夹具测试与 playground 共用同一份宿主陷阱 | 测试跑在 iframe 里：媒体仿真能传进 iframe、三内核都能仿真出 `hover: none`，v9 已证实（[`tech-stack.md`](tech-stack.md) 第十二节）。仿真会跨用例残留、不仿真时的基线又取决于宿主系统（CI 的 Linux WebKit 默认 reduced-motion），由 setup 在每条用例前设回同一基线。原先「各测试文件共享 WebGL 上下文上限、要串行跑」的判断已证伪（并行时每个文件有独立的页面） |
+| 集成层并入 Vitest 浏览器模式，不另起 `@playwright/test`（v7） | 只有一个测试框架、一份配置、一个 CI 步骤；夹具测试与 playground 共用同一份宿主陷阱 | 测试跑在 iframe 里：媒体仿真能传进 iframe、三内核都能仿真出 `hover: none`，v9 已证实（[`tech-stack.md`](tech-stack.md) 第十二节）。仿真会跨用例残留、不仿真时的基线又取决于宿主系统（CI 的 Linux WebKit 默认 reduced-motion），由 setup 在每个测试文件与每条用例开始前设回同一基线。原先「各测试文件共享 WebGL 上下文上限、要串行跑」的判断已证伪（每个文件都是新的 iframe 文档，上限只在单个文档内生效） |
 | 壳测试也进真浏览器，不用 happy-dom | happy-dom 没有 WebGL；第六节那类「重渲染抹掉内核写的东西」只有真 DOM 才验得准 | 测试慢于 happy-dom；CI 要装三个浏览器 |
-| CI 里 Chromium 显式开 `--enable-unsafe-swiftshader` | CI 机器没有 GPU。Chrome 从 130 起废弃「自动回退到 SwiftShader 软件渲染」；Playwright 1.63 已默认追加这个开关（v9 实测），显式写上是不把可信度押在上游默认值上。环境可信由三内核的已知结果探针证明，否则内核测试会全部走进门控分支 —— **全绿但什么都没测** | 软件渲染与真 GPU 的像素不完全一致，像素判据只能用「有没有非透明像素」这类宽判据，或只用 k/255 能整除的颜色（0.7 这类值在 SwiftShader 与 GPU 上取整不同）。Firefox 在 Linux 上 headless 建不出 WebGL，CI 里以 headed 模式跑在 xvfb 里 |
+| CI 里 Chromium 显式开 `--enable-unsafe-swiftshader` | CI 机器没有 GPU。Chrome 从 130 起废弃「自动回退到 SwiftShader 软件渲染」；Playwright 1.63 已默认追加这个开关（v9 实测），显式写上是不把可信度押在上游默认值上。环境可信由三内核的已知结果探针证明，否则内核测试会全部走进门控分支 —— **全绿但什么都没测** | 软件渲染与真 GPU 的像素不完全一致，像素判据只能用「有没有非透明像素」这类宽判据，或只用 k/255 能整除的颜色（0.7 这类值在 SwiftShader 与 GPU 上取整不同）。CI 里 Firefox 跑在 xvfb 提供的 display 下（外部报告说 Linux 上 headless Firefox 建不出 WebGL；CI 实测 xvfb 下 headless 也建得出，见 tech-stack 第六节） |
 
 纪律：每个守卫写完故意破坏一次确认变红；变异后先 `cmp` 确认文件真改了再读结果；布局类判据一律挪到真浏览器。
 

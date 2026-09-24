@@ -23,6 +23,23 @@
 > **2026-09-24 Hubery 已拍板**：一、由 Claude 查清安装方式后执行升级（已完成，见任务 0）；二、全仓库放开破折号；三、全部采纳；四、同意；
 > 执行方式：本会话直接执行（superpowers:executing-plans）。
 
+## 执行偏离（2026-09-24，执行后补记）
+
+阶段 0 已按本计划执行完毕。下列几处与原文不同，**以仓库现状为准**；正文里对应的旧段落不再逐处改写，读到时以本节为准：
+
+1. **任务 5 的 `test/browser/setup.ts` 已被取代。** 原文是 `afterEach` 里 `emulateMedia({ reducedMotion: null, forcedColors: null })`。
+   CI 的 Linux WebKit 不仿真时默认就是 `prefers-reduced-motion: reduce`，`null` 只回到这个宿主默认值，基线断言在 WebKit 上红（run 35947725585）；
+   终审又复现出同一 page 会依次跑多个测试文件、仿真漏进下一个文件的 `beforeAll`。现行写法是 `beforeAll` + `beforeEach` 都显式设成
+   `no-preference` / `none`；`emulation.browser.test.ts` 加了一条「记下宿主的默认值」，在 CI 的 WebKit 上兼作回归用例。
+   任务 5「接口」里「每条用例后自动撤掉媒体仿真」应读作「每个测试文件与每条用例开始前回到同一基线」；变异表那一行相应改为删掉这两个钩子。
+2. **touch instance 也跑已知结果探针**（`touchInclude` 加上 `env-probe.browser.test.ts`），终审指出的缺口。
+3. **计数**：browser 117 条（三个默认 instance 各 35 条，三个 touch instance 各 4 条），全量 195 条（unit 72 + browser 117 + dist 6）；
+   正文里的 105 / 183 是这两处改动之前的数。
+4. **Firefox 的 headed**：CI 实测 headless 的 firefox-touch 在 xvfb 下同样建得出 WebGL，默认 instance 改 headed 是否必需未证实（tech-stack 第六节）。
+5. **commitlint** 限制正文每行 100 字符，提交正文要折行。
+6. **推送**在 Claude Code 沙箱里连接时断时续，改在沙箱外执行。CI 三轮：35947725585（WebKit 基线红）→ 35948298490（全绿）→ 35950071354（终审修复后全绿）。
+7. 执行台账在 `.superpowers/sdd/`，不进仓库；偏离以本节为准。
+
 ### 一、开工前必须由 Hubery 执行：修好全局 pnpm
 
 本机 PATH 上的 pnpm 是 npm 全局装的 10.28.2。项目写 `packageManager: pnpm@12.5.1` 之后，pnpm 10 自动切换到 12.5.1 会失败

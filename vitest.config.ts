@@ -7,8 +7,8 @@ import * as commands from './test/browser/commands.ts'
 // Playwright 1.63 启动 Chromium 时已默认追加这个开关；显式写上，不把 CI 里 WebGL 能否创建押在上游默认值上
 const chromiumArgs = ['--enable-unsafe-swiftshader']
 
-// Linux 上 headless Firefox 建不出 WebGL（Mozilla bug 1375585），CI 里改 headed，由 xvfb-run 提供 display；
-// 本地 macOS 的 headless Firefox 能建 WebGL，不必每次弹窗
+// 外部报告（Mozilla bug 1375585）说 Linux 上 headless Firefox 建不出 WebGL，CI 里按此改 headed，由 xvfb-run 提供 display。
+// 但 CI 实测 headless 的 firefox-touch 在 xvfb 下也建得出，headed 是否必需待证（tech-stack 第六节）；本地 macOS 不必弹窗
 const firefoxHeadless = !process.env.CI
 
 // hover: none 只能靠 contextOptions.hasTouch 仿真，contextOptions 又只能按 instance 配，
