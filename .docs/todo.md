@@ -8,6 +8,8 @@
 > - 每个阶段开工时，先按 writing-plans 写一份详细实现计划到 `.docs/plans/`（精确到文件、测试代码、命令），审阅通过再动手；
 >   本清单只列任务与判据，不写代码。
 > - 完成一项勾一项，随提交一起更新。发现清单与三份文档冲突时，以文档为准并回头修清单。
+> - **每个阶段收尾时，终审与执行中遗留的问题（包括 Minor）记在该阶段的「遗留问题」里，全部清零才开下一阶段**（Hubery 2026-09-24 定：
+>   保证每个阶段完全没问题再推进）。遗留问题在新会话里修，修法同样先写计划或先复现，再动手。
 
 ## 阶段 0：基建
 
@@ -31,12 +33,41 @@
 - [x] **证实 7 条假设**：[`tech-stack.md`](tech-stack.md) 第十二节逐条跑探针；`emulateMedia` 传不进 iframe 就把集成层退回 `@playwright/test`，并回头改 tech-stack
 - [x] **守卫自证**：lint 的每条依赖方向规则、attw / publint、tsnapi、产物里没有 ogl 的断言，逐个故意违反一次，确认变红（变异后先 `cmp` 确认文件真改了）
 
-阶段 0 于 2026-09-24 完成，实现计划与执行记录见 [`plans/2026-09-24-phase-0-infra.md`](plans/2026-09-24-phase-0-infra.md)；CI 全绿见 run 35948298490。
+阶段 0 的任务与完成判据已于 2026-09-24 全部满足（实现计划与执行偏离见 [`plans/2026-09-24-phase-0-infra.md`](plans/2026-09-24-phase-0-infra.md)；
+CI 全绿：dev 上 run 35950631877、main 上 run 35951134904）。**下面的遗留问题清零之后，阶段 0 才算关闭、才开阶段 1。**
 
 完成判据：CI 在骨架上全绿；三个内核的 WebGL / Canvas 2D 已知结果探针通过；两个入口产出 d.ts，publint 与 attw 零报错；
 `npm publish --dry-run` 的文件清单只有 `dist` 与必要元数据；第十二节的假设全部证实（或已按兜底方案改选型）。
 
+### 阶段 0 遗留问题（开阶段 1 之前必须清零）
+
+来源：阶段 0 的独立终审（Minor 级）与执行中留下的待证项。每一项修完都要有证据（守卫类先见一次红），修完勾掉。
+
+- [ ] **`many-instances` 夹具的自检是同义反复**：[`test/browser/host-fixtures.browser.test.ts`](../test/browser/host-fixtures.browser.test.ts) 里那条只断言
+  夹具自己的常量 `18 > 16`，从没见过「上下文被挤掉」的现场。改成真的建上下文、数被挤掉的个数，按内核给预期：终审在 macOS 上实测
+  Chromium、WebKit 建 18 个会丢最早的 2 个，**Firefox 一个不丢**（在 Firefox 上这个夹具不构成陷阱，测试里要明说）；Linux（CI）上的个数要在 CI 里实测后再定断言
+- [ ] **design 第九节「display-p3 回读三内核一致」没有测试支撑**：[`design.md`](design.md) 第九节那句只有 macOS 干跑证据。在 modern-colors 自检里加一行
+  `color(display-p3 1 0 0)`（预期回读 `255,0,0`），让 CI 的 Linux 也跑一遍；或者把措辞改成「macOS 实测」
+- [ ] **`release.yml` 的 checkout 把可写 token 留给了所有步骤**：[`.github/workflows/release.yml`](../.github/workflows/release.yml) 的 `actions/checkout`
+  默认把 `contents: write` 的 token 写进 `.git/config`，之后的 `pnpm install` 与跑第三方代码的测试都读得到。加 `persist-credentials: false`
+  （changelogithub 走环境变量里的 token 调 API，不需要 git 凭据）
+- [ ] **两个零消费方的脚本**：[`package.json`](../package.json) 的 `dev`（`tsdown --watch`，playground 的 alias 指向 `src`，没有东西读 watch 产物）与
+  `commitlint`（钩子直接 `pnpm exec commitlint`，不经过它）。按「零消费方一律删除」删掉，README 命令表与 CLAUDE.md 若提到要同步
+- [ ] **lint 守卫放行了一条构建不通的路**：[`test/unit/eslint-guards.test.ts`](../test/unit/eslint-guards.test.ts) 放行 `src/vue/` 里
+  `import '@huberyyang/todo-fx'`，但终审实测 tsdown 构建这种写法报 `UNRESOLVED_IMPORT`。把 vue 项的包名自引用改为拦截（提示指向 `'../index'`），
+  放行用例改成拦截用例，并照例变异验证
+- [ ] **CI 里 Firefox 用 headed 是否必需**：CI 实测 headless 的 firefox-touch 在 xvfb 下也建得出 WebGL（run 35950071354），默认 Firefox instance 的
+  `headless: !process.env.CI` 可能不必要。在 CI 上去掉它（Firefox 全部 headless、仍在 `xvfb-run` 下）看探针；再试一次不套 `xvfb-run`，
+  确定到底是 headed 还是 display 在起作用，据此简化配置并改正 [`tech-stack.md`](tech-stack.md) 第六、九节与 [`vitest.config.ts`](../vitest.config.ts) 的注释
+- [ ] **tech-stack 第一节「tsdown 生成 d.ts 依赖 TS 编译器 API」待核实**：调研时读 rolldown-plugin-dts 0.28.6 源码发现它在 TS 7 下会改用 tsgo，
+  tsdown 0.23.0 的 typescript peer 也包含 `^7.0.0`，这条锁 TS 6 的理由对 tsdown 可能不成立（vue-tsc 与 typescript-eslint 两条理由不受影响）。
+  只读过源码、没实跑，核实后改正那一行
+- [ ] **CLAUDE.md 候选（需 Hubery 同意）**：触发式索引补一行「写浏览器测试或新增自定义 command 之前 → [`tech-stack.md`](tech-stack.md) 第六节 →
+  否则依赖宿主系统默认的媒体状态，只在 CI 的 WebKit 上红」
+
 ## 阶段 1：运行时 + `liquid-text`
+
+> 开工前先确认上面的「阶段 0 遗留问题」已全部勾掉。
 
 - [ ] **纯计算层**：`approach`（连同 my-blog 的 `animation.test.ts` 一起迁）、`proximity`、`params`（派生、公共参数覆盖、
   `undefined` 恢复默认、按键名路由、选项类型映射）—— [`architecture.md`](architecture.md) 第五、六节
