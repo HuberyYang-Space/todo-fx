@@ -21,7 +21,7 @@
   `publint`、`attw: { profile: 'esm-only', level: 'error' }` —— [`tech-stack.md`](tech-stack.md) 第四节
 - [x] **lint**：`@antfu/eslint-config`（`type: 'lib'`、`vue: true`、`antislop: true`）；`.vscode` 两份配置照抄 README；
   按目录的依赖方向规则 —— [`tech-stack.md`](tech-stack.md) 第七节、[`architecture.md`](architecture.md) 第八节
-- [ ] **提交钩子**：跑 `todo-scripts commitlint-init`（husky + lint-staged + commitlint）—— [`tech-stack.md`](tech-stack.md) 第八节
+- [x] **提交钩子**：跑 `todo-scripts commitlint-init`（husky + lint-staged + commitlint）—— [`tech-stack.md`](tech-stack.md) 第八节
 - [ ] **测试框架**：Vitest 三个 project（`unit` / `browser` / `dist`）；Playwright 三个内核，Chromium 开 `--enable-unsafe-swiftshader`；
   `vitest-browser-vue`、`@vitejs/plugin-vue`；`typecheck` 走 `vue-tsc --noEmit`；`dist` 用 `globalSetup` 先 build，接 tsnapi —— [`tech-stack.md`](tech-stack.md) 第五、六节
 - [ ] **playground**：Vite 多页纯 HTML + Vue 夹具页，alias 指向 `src`；[`design.md`](design.md) 第十三节的 8 个宿主场景夹具写成模块，
