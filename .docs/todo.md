@@ -19,7 +19,7 @@
 - [x] **TypeScript**：`typescript ^6.0.3`、`@types/node ^24.13.6`；tsconfig 对齐 starter-ts 并加 DOM lib —— [`tech-stack.md`](tech-stack.md) 第三节
 - [ ] **构建**：`tsdown` 精确锁 `0.23.0`；两个入口、`dts`、`exports: true`、`target: 'es2020'`、`platform: 'neutral'`、
   `publint`、`attw: { profile: 'esm-only', level: 'error' }` —— [`tech-stack.md`](tech-stack.md) 第四节
-- [ ] **lint**：`@antfu/eslint-config`（`type: 'lib'`、`vue: true`、`antislop: true`）；`.vscode` 两份配置照抄 README；
+- [x] **lint**：`@antfu/eslint-config`（`type: 'lib'`、`vue: true`、`antislop: true`）；`.vscode` 两份配置照抄 README；
   按目录的依赖方向规则 —— [`tech-stack.md`](tech-stack.md) 第七节、[`architecture.md`](architecture.md) 第八节
 - [ ] **提交钩子**：跑 `todo-scripts commitlint-init`（husky + lint-staged + commitlint）—— [`tech-stack.md`](tech-stack.md) 第八节
 - [ ] **测试框架**：Vitest 三个 project（`unit` / `browser` / `dist`）；Playwright 三个内核，Chromium 开 `--enable-unsafe-swiftshader`；
