@@ -24,7 +24,7 @@
 - [x] **提交钩子**：跑 `todo-scripts commitlint-init`（husky + lint-staged + commitlint）—— [`tech-stack.md`](tech-stack.md) 第八节
 - [x] **测试框架**：Vitest 三个 project（`unit` / `browser` / `dist`）；Playwright 三个内核，Chromium 开 `--enable-unsafe-swiftshader`；
   `vitest-browser-vue`、`@vitejs/plugin-vue`；`typecheck` 走 `vue-tsc --noEmit`；`dist` 用 `globalSetup` 先 build，接 tsnapi —— [`tech-stack.md`](tech-stack.md) 第五、六节
-- [ ] **playground**：Vite 多页纯 HTML + Vue 夹具页，alias 指向 `src`；[`design.md`](design.md) 第十三节的 8 个宿主场景夹具写成模块，
+- [x] **playground**：Vite 多页纯 HTML + Vue 夹具页，alias 指向 `src`；[`design.md`](design.md) 第十三节的 8 个宿主场景夹具写成模块，
   playground 与 `browser` project 共用 —— [`tech-stack.md`](tech-stack.md) 第十节
 - [ ] **CI 与发版流程**：`ci.yml`（含浏览器安装与缓存、`vue@3.5.0` 最低 peer 版本 job）、`release.yml`、`changelogithub.config.ts`（中文标题）、
   `pnpm release` 门禁（`bumpp --no-verify` → `npm publish`）—— [`tech-stack.md`](tech-stack.md) 第八、九节
