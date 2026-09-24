@@ -13,10 +13,10 @@
 
 目标：骨架上 CI 全绿，而且全绿是可信的。
 
-- [ ] **包骨架**：`package.json`（`name: @huberyyang/todo-fx`、`type: module`、`packageManager: pnpm@12.5.1`、`sideEffects: false`、`files: ["dist"]`、
+- [x] **包骨架**：`package.json`（`name: @huberyyang/todo-fx`、`type: module`、`packageManager: pnpm@12.5.1`、`sideEffects: false`、`files: ["dist"]`、
   `publishConfig.access: public`、`ogl ^1.0.11` 进 dependencies、`vue ^3.5.0` 为 optional peer）；`pnpm-workspace.yaml`
   （`trustPolicy: no-downgrade`、`shellEmulator: true`）；LICENSE（MIT）；中文 README 骨架 —— [`tech-stack.md`](tech-stack.md) 第二、三、四、八节
-- [ ] **TypeScript**：`typescript ^6.0.3`、`@types/node ^24.13.6`；tsconfig 对齐 starter-ts 并加 DOM lib —— [`tech-stack.md`](tech-stack.md) 第三节
+- [x] **TypeScript**：`typescript ^6.0.3`、`@types/node ^24.13.6`；tsconfig 对齐 starter-ts 并加 DOM lib —— [`tech-stack.md`](tech-stack.md) 第三节
 - [ ] **构建**：`tsdown` 精确锁 `0.23.0`；两个入口、`dts`、`exports: true`、`target: 'es2020'`、`platform: 'neutral'`、
   `publint`、`attw: { profile: 'esm-only', level: 'error' }` —— [`tech-stack.md`](tech-stack.md) 第四节
 - [ ] **lint**：`@antfu/eslint-config`（`type: 'lib'`、`vue: true`、`antislop: true`）；`.vscode` 两份配置照抄 README；
