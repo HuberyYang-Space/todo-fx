@@ -92,7 +92,7 @@ CI 全绿：dev 上 run 38187868745），**阶段 0 关闭**。
 完成判据：playground 的宿主场景夹具里表现与 my-blog 现状一致；[`design.md`](design.md) 第十二节的内核判据通过。
 
 阶段 1 的任务已于 2026-10-12 完成（实现计划与执行偏离见 [`plans/2026-10-12-phase-1-runtime-liquid-text.md`](plans/2026-10-12-phase-1-runtime-liquid-text.md)；
-CI 全绿：dev 上 run 38195756526）。内核判据由自动化测试覆盖（三内核）；夹具表现已在真实 Chrome 里按 DOM 状态与 console 验过，
+CI 全绿：终审修复后 dev 上 run 38213171998，browser job 重跑一次仍全绿）。内核判据由自动化测试覆盖（三内核）；夹具表现已在真实 Chrome 里按 DOM 状态与 console 验过，
 **手感一致性（流动、色差、余韵、边缘粗细）待 Hubery 对照 my-blog 确认**。
 
 ### 阶段 1 遗留问题（开阶段 2 之前必须清零）

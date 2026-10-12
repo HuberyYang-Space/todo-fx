@@ -52,6 +52,7 @@ my-blog 的 [`HeroTitle.vue`](https://github.com/HuberyYang-Space/my-blog/blob/2
    第一版的起始尺寸取 `getBoundingClientRect`，CI 上 transform 那条又红了一次（run 38212512796）：祖先缩放时它与 ResizeObserver 的布局尺寸对不上，照样多出一次信号。
    改为取计算样式（content-box 补上内边距与边框；计算样式里的内边距是声明值、布局按 1/64px 对齐，实测相加差 0.012px，所以留 0.1px 容差），补「transform / 小数宽度 / 两种 box-sizing 下都只建一次」三条测试先见红；
    ResizeObserver 回调推迟 300ms 的压力复现两内核全绿，5 条变异两内核全红。
+10. **最终状态**：本地门禁 30 个文件 316 条全过；dev 上 run 38213171998 三个 job 全绿，browser job 重跑一次仍全绿。
 
 ## 需要 Hubery 拍板的事
 
