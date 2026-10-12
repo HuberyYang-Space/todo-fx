@@ -1,6 +1,7 @@
 import type { LiquidTextOptions } from '../../src/index'
 import type { MountedHeading } from './helpers'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { commands } from 'vitest/browser'
 import { createLiquidText } from '../../src/index'
 import { mountHeading, nextFrames, readPixels } from './helpers'
 
@@ -130,6 +131,20 @@ describe('liquid-text', () => {
     start({ idle: 0 })
     await expect.poll(async () => (await solidColor()).count).toBeGreaterThan(100)
     await expectStirred()
+  })
+
+  it('休眠中（从没 build 过）的画布不撑出横向滚动：触屏用户一开始就是这个状态', async () => {
+    await commands.emulateMedia({ reducedMotion: 'reduce' })
+    const box = document.createElement('div')
+    box.style.cssText = 'width: 300px; overflow: auto;'
+    target.heading.before(box)
+    box.append(target.heading)
+    cleanups.push(() => box.remove())
+    start()
+    await nextFrames(3)
+    expect(target.textEl.style.color).toBe('')
+    // ogl 的 Renderer 一构造就往画布上写 300×150，它又排在标题末尾
+    expect(box.scrollWidth).toBe(box.clientWidth)
   })
 
   it('拿不到 WebGL 上下文时返回 null，不报错', () => {

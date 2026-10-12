@@ -20,10 +20,17 @@ export interface FakeLog {
   frames: Array<FrameState & { level: number }>
   /** 每次调 build / frame 时 textEl 的 inline color：证明首帧画完之前没有涂透明 */
   colorAtHook: string[]
-  /** 每次调 build / frame 时画布的计算 visibility：首帧画完之前画布不该露出来 */
+  /** 每次调 build / frame 时画布露没露出来（'shown' / 'hidden'）：首帧画完之前画布不该露出来 */
   canvasAtHook: string[]
+  /** 每次 build 时画布的 inline left / top：首次 build 发生在画布露出来之前，那时也要定位对 */
+  placementAtBuild: string[]
   /** 与 calls 一一对应的 document.timeline.currentTime：同一帧里调用的值相同 */
   frameTimes: unknown[]
+}
+
+function visibility(canvas: HTMLCanvasElement): 'shown' | 'hidden' {
+  const style = getComputedStyle(canvas)
+  return style.display !== 'none' && style.visibility === 'visible' ? 'shown' : 'hidden'
 }
 
 /**
@@ -31,7 +38,7 @@ export interface FakeLog {
  * 在画布上拿 WebGL2 上下文，好测上下文丢失与释放
  */
 export function createFakeEffect(textEl: HTMLElement): { create: typeof fake.create, log: FakeLog, control: FakeControl } {
-  const log: FakeLog = { calls: [], rasters: [], frames: [], colorAtHook: [], canvasAtHook: [], frameTimes: [] }
+  const log: FakeLog = { calls: [], rasters: [], frames: [], colorAtHook: [], canvasAtHook: [], placementAtBuild: [], frameTimes: [] }
   const control: FakeControl = { setupReturnsNull: false, throwIn: null, stallMs: 0 }
   const record = (call: string): void => {
     log.calls.push(call)
@@ -53,7 +60,8 @@ export function createFakeEffect(textEl: HTMLElement): { create: typeof fake.cre
         build(raster) {
           record('build')
           log.colorAtHook.push(textEl.style.color)
-          log.canvasAtHook.push(getComputedStyle(canvas).visibility)
+          log.canvasAtHook.push(visibility(canvas))
+          log.placementAtBuild.push(`${canvas.style.left} ${canvas.style.top}`)
           log.rasters.push(raster)
           if (control.throwIn === 'build')
             throw new Error('build 故意抛错')
@@ -61,7 +69,7 @@ export function createFakeEffect(textEl: HTMLElement): { create: typeof fake.cre
         frame(state) {
           record('frame')
           log.colorAtHook.push(textEl.style.color)
-          log.canvasAtHook.push(getComputedStyle(canvas).visibility)
+          log.canvasAtHook.push(visibility(canvas))
           log.frames.push({ ...state, level: params.level })
           if (control.throwIn === 'frame')
             throw new Error('frame 故意抛错')

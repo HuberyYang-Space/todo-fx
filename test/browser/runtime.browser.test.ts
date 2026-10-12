@@ -38,7 +38,8 @@ const painted = (): string => target.textEl.style.color
  * 被挤掉上下文的画布在 Chromium 里还会画成不透明的白块，把真文本整个盖住（真实 Chrome 里 A/B 证实）
  */
 function shown(layerEl = target.layerEl): boolean {
-  return getComputedStyle(layerEl.querySelector('canvas')!).visibility === 'visible'
+  const style = getComputedStyle(layerEl.querySelector('canvas')!)
+  return style.display !== 'none' && style.visibility === 'visible'
 }
 
 async function expectFrozen(frames: unknown[]): Promise<void> {
@@ -135,9 +136,20 @@ describe('开播', () => {
     const raster = log.rasters.at(-1)!
     expect(canvas.width).toBe(raster.width)
     expect(raster.width).toBe(Math.round((text.width + 40) * raster.dpr))
+    // 每次 build 定出的位置都一样：首次 build 时画布还 display: none，自己的 offsetParent 是 null，不能拿它当基准
+    expect(new Set(log.placementAtBuild)).toEqual(new Set([`${canvas.style.left} ${canvas.style.top}`]))
     expect(canvas.style.maxWidth).toBe('none')
     expect(canvas.style.pointerEvents).toBe('none')
     expect(canvas.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('宿主用 visibility: hidden 藏起容器（下拉、弹层、淡出过渡）时，画布跟着藏', async () => {
+    start()
+    await expect.poll(painted).toBe('transparent')
+    // 文字宽度不为 0、特效照常播放；画布要像真文本一样继承祖先的 hidden，否则真文本藏了、画布还悬在原位
+    target.heading.style.visibility = 'hidden'
+    expect(getComputedStyle(target.textEl).visibility).toBe('hidden')
+    expect(shown()).toBe(false)
   })
 
   it('宿主 reset 的 canvas { max-width: 100% } 压不扁画布', async () => {

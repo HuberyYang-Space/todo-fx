@@ -60,7 +60,7 @@ describe('宿主场景夹具', () => {
     await nextFrames(10)
     expect(colors()).toEqual(expected)
     // 被挤掉的画布在 Chromium 里会画成不透明白块，必须藏起来，否则真文本被盖住
-    const shown = targets.map(({ layerEl }) => getComputedStyle(layerEl.querySelector('canvas')!).visibility === 'visible')
+    const shown = targets.map(({ layerEl }) => getComputedStyle(layerEl.querySelector('canvas')!).display !== 'none')
     expect(shown).toEqual(expected.map(c => c === 'transparent'))
   })
 })

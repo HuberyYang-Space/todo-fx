@@ -136,7 +136,7 @@ export function defineEffect<T extends ParamTable>(definition: EffectDefinition<
         return
       colorBeforePaint = textEl.style.color
       textEl.style.color = 'transparent'
-      canvas.style.visibility = 'visible'
+      canvas.style.display = ''
       painted = true
     }
 
@@ -144,7 +144,7 @@ export function defineEffect<T extends ParamTable>(definition: EffectDefinition<
       if (!painted)
         return
       textEl.style.color = colorBeforePaint
-      canvas.style.visibility = 'hidden'
+      canvas.style.display = 'none'
       painted = false
     }
 
