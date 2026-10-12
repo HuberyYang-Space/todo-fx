@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 可复用的页面特效库，包名 `@huberyyang/todo-fx`。首个消费方是
 [my-blog](https://github.com/HuberyYang-Space/my-blog)，首页标题的液态文字特效从那里抽出来。
 
-**当前状态：阶段 0（基建）已完成，下一步是修阶段 0 的遗留问题（见 [`.docs/todo.md`](.docs/todo.md)），清零后再开阶段 1（运行时 + liquid-text）。** 进度与各阶段任务见
+**当前状态：阶段 0（基建）已完成并关闭（遗留问题已清零），下一步是阶段 1（运行时 + liquid-text）。** 进度与各阶段任务见
 [`.docs/todo.md`](.docs/todo.md)，每个阶段开工前先写详细实现计划到 [`.docs/plans/`](.docs/plans/)。
 
 | 命令 | 作用 |
@@ -53,6 +53,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 写或改运行时、共享件、钩子契约、参数表、导出面 | [`.docs/architecture.md`](.docs/architecture.md) | 在特效里重写休眠与涂透明的时序；让运行时长出可选钩子；壳绕过公开入口 import 内部模块 |
 | 动发版流程、CI，或让消费方接入 | [`.docs/design.md`](.docs/design.md) 第十二、十三节；[`.docs/tech-stack.md`](.docs/tech-stack.md) 第八、九节 | CI 里 WebGL 没开软件渲染导致测试全绿却什么都没测；或新版本被 my-blog 的发布冷却期 / `trustPolicy` 卡住 |
 | 新增或升级依赖、改构建 / 测试 / lint / CI 配置 | [`.docs/tech-stack.md`](.docs/tech-stack.md) | 把 TypeScript 升到 7，类型检查与 lint 全挂；或 attw 留在默认的 `warn` 级别，产物类型出错也照常构建成功 |
+| 写浏览器测试，或新增会改 page 状态的自定义 command | [`.docs/tech-stack.md`](.docs/tech-stack.md) 第六节「集成」一行 | 测试依赖宿主系统默认的媒体状态，本地全绿、只在 CI 的 Linux WebKit 上红；或新 command 的状态跨用例、跨文件残留 |
 
 ## 取舍原则
 
@@ -107,8 +108,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **提交与 Release notes 用中文。** 提交走 `/commit`（中文）；`changelogithub.config.ts` 的分类标题配成中文，
   与提交一致。不要仿照 `todo-scripts` 改成英文提交 —— 那是它自己的取舍。英文 README 等推广到社区时再加。
 - **TypeScript 锁在 6.x，不要升到 7。** 7.0 的 npm 包不再导出编译器 API（实测 `require('typescript').createProgram`
-  为 `undefined`），vue-tsc、typescript-eslint、tsdown 生成 d.ts 都依赖它；`taze major` 提示升级时跳过。
-  等这三者都声明支持 7 再议。
+  为 `undefined`），vue-tsc、typescript-eslint 都依赖它（tsdown 装了 TS 7.0 会自动改用 tsgo 生成 d.ts，不受影响；但前提是壳不用 SFC 写，
+  实测见 tech-stack 第一节）；`taze major` 提示升级时跳过。等这两者都声明支持 7 再议。
 - **`vitest run -u <文件>` 会把文件路径吞成 `-u` 的值**，结果全量更新快照；要写成 `vitest run <文件> -u`。
 - **测试目录不能叫 `dist`。** antfu 默认忽略 `**/dist`，整个目录静默跳过 lint；产物测试放在 `test/artifact/`。
 - **变异实验不要走 `pnpm exec` / `pnpm run`，直接调 `node_modules/.bin/<工具>`。** pnpm 12 发现 package.json 与 node_modules 不同步时

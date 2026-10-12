@@ -34,7 +34,8 @@
 - [x] **守卫自证**：lint 的每条依赖方向规则、attw / publint、tsnapi、产物里没有 ogl 的断言，逐个故意违反一次，确认变红（变异后先 `cmp` 确认文件真改了）
 
 阶段 0 的任务与完成判据已于 2026-09-24 全部满足（实现计划与执行偏离见 [`plans/2026-09-24-phase-0-infra.md`](plans/2026-09-24-phase-0-infra.md)；
-CI 全绿：dev 上 run 35950631877、main 上 run 35951134904）。**下面的遗留问题清零之后，阶段 0 才算关闭、才开阶段 1。**
+CI 全绿：dev 上 run 35950631877、main 上 run 35951134904）。下面的遗留问题已于 2026-10-12 全部清零（计划与执行偏离见 [`plans/2026-09-24-phase-0-leftovers.md`](plans/2026-09-24-phase-0-leftovers.md)；
+CI 全绿：dev 上 run 38187868745），**阶段 0 关闭**。
 
 完成判据：CI 在骨架上全绿；三个内核的 WebGL / Canvas 2D 已知结果探针通过；两个入口产出 d.ts，publint 与 attw 零报错；
 `npm publish --dry-run` 的文件清单只有 `dist` 与必要元数据；第十二节的假设全部证实（或已按兜底方案改选型）。
@@ -62,8 +63,8 @@ CI 全绿：dev 上 run 35950631877、main 上 run 35951134904）。**下面的�
 - [x] **tech-stack 第一节「tsdown 生成 d.ts 依赖 TS 编译器 API」待核实**：调研时读 rolldown-plugin-dts 0.28.6 源码发现它在 TS 7 下会改用 tsgo，
   tsdown 0.23.0 的 typescript peer 也包含 `^7.0.0`，这条锁 TS 6 的理由对 tsdown 可能不成立（vue-tsc 与 typescript-eslint 两条理由不受影响）。
   只读过源码、没实跑，核实后改正那一行（2026-10-12 实跑：TS 7.0.2 下走 tsgo，d.ts 与 TS 6 逐字节一致，这条理由对 tsdown 不成立，已改正；锁 6 的结论不变）
-- [ ] **CLAUDE.md 候选（需 Hubery 同意）**：触发式索引补一行「写浏览器测试或新增自定义 command 之前 → [`tech-stack.md`](tech-stack.md) 第六节 →
-  否则依赖宿主系统默认的媒体状态，只在 CI 的 WebKit 上红」
+- [x] **CLAUDE.md 候选（需 Hubery 同意）**：触发式索引补一行「写浏览器测试或新增自定义 command 之前 → [`tech-stack.md`](tech-stack.md) 第六节 →
+  否则依赖宿主系统默认的媒体状态，只在 CI 的 WebKit 上红」（2026-10-12 Hubery 同意，已加进触发式索引）
 
 ## 阶段 1：运行时 + `liquid-text`
 

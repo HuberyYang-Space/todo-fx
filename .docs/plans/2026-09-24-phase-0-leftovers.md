@@ -16,6 +16,25 @@
 
 ---
 
+## 执行偏离（2026-10-12，执行后补记）
+
+本计划已执行完毕，以仓库现状为准；正文里对应的旧段落不再逐处改写：
+
+1. **本机 Firefox 一直没起来**（`Could not find profile folder`），Hubery 也没回报外部终端的结果。本地门禁只跑 Chromium、WebKit 及其 touch instance，
+   Firefox 的全部结论来自 CI；任务 5 Step 4（Firefox 预期表的变异）本地跳过，由 CI 绿兜底（键写错时 `toEqual(undefined)` 会红）。
+2. **touch instance 的 project 名**是 `chromium-touch` / `webkit-touch`，不带 `browser` 前缀；写错会被 vitest 静默跳过（第一次本地门禁因此只跑了 149 条）。
+   「执行须知」里的 `LOCAL_BROWSER` 已改正。本地门禁最终 157 条全过（unit 73 + dist 6 + Chromium 35 + WebKit 35 + 两个 touch instance 各 4）。
+3. **任务 7 落在决策表第二行**：headed 不需要、display 需要。xvfb 分支 run 38187560309 全绿（117/117）；bare 分支 run 38187560274 只有 Firefox 的 WebGL 建不出
+   （`getContext` 返回 `null`，Canvas 2D 照常），Chromium、WebKit 不需要 display。所以任务 8 是删 `firefoxHeadless`、**保留** `xvfb-run`，不是正文按第一行写的去掉 xvfb。
+4. **Linux 数字与 macOS 一致**：被挤掉的下标 Chromium、WebKit 为 `[0,1]`，Firefox 为 `[]`；p3 在 Linux 三内核都读回 `255,0,0`。断言没有按平台分开。
+5. **任务 4 实跑结果**：TS 7.0.2 下 tsdown 0.23.0 走 tsgo，exit 0；与 TS 6.0.3 走 tsc 的 d.ts 逐字节一致。前提是 `src` 里没有 `.vue`（终审补充）。
+6. **commitlint 的 subject-case** 会拒绝以大写英文单词开头的主题（`CI`、`Firefox`）。一次被拒后暂存区混进了 docs 提交，推送前用 soft reset 拆回两次提交。
+7. **终审**（opus，独立上下文）：Critical 0 / Important 0 / Minor 6，按「Minor 也清零」全部修掉（提交 79a1483）：design 第九节 p3 的证据范围
+   （macOS 的 Firefox 只有干跑证据）、checkout v6 起凭据存在 `$RUNNER_TEMP` 下的单独文件、tsdown 不受 TS 7 影响的前提、多实例用例结束时释放上下文、
+   本节第 2 条的 project 名、vue 规则复用 `noSelfReference` 的正则。
+8. **CLAUDE.md** 三处改动 Hubery 2026-10-12 均同意。「TypeScript 锁在 6.x」一条在批准的措辞上补了终审指出的前提（壳不用 SFC 写）。
+9. **CI**：dev 上 run 38187868745 三个 job 全绿；两条实验分支已从本地与远端删除。
+
 ## 需要 Hubery 拍板的事
 
 ### 一、CLAUDE.md 的三处改动（按全局规则须同意）
