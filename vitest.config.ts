@@ -25,8 +25,8 @@ export default defineConfig({
       },
       {
         extends: true,
-        // 首次运行（CI 每次都是）时 vue 要到测试中途才被发现、临时预构建，随即整页重载，正在导入的测试文件全部失败
-        optimizeDeps: { include: ['vue'] },
+        // 首次运行（CI 每次都是）时依赖要到测试中途才被发现、临时预构建，随即整页重载，正在导入的测试文件全部失败
+        optimizeDeps: { include: ['vue', 'ogl'] },
         test: {
           name: 'browser',
           include: ['test/browser/**/*.browser.test.ts'],
