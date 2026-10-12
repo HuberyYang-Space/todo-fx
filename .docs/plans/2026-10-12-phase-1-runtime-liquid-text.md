@@ -49,6 +49,9 @@ my-blog 的 [`HeroTitle.vue`](https://github.com/HuberyYang-Space/my-blog/blob/2
 9. **推送后 CI 的 Linux WebKit 红了一次**（run 38211998163）：transform 那条测试数到了多出来的一次 build。根因是终审 Minor 里的「开播后 ResizeObserver 首次回调再建一次」，
    慢机器上它晚于首帧到达，被算进了被测操作。本地把 ResizeObserver 回调推迟 150ms 复现（另一条计数测试同样红），于是不再当 Minor 延后：
    watcher 比对尺寸、没变就不算信号；先写「开播只建一次」的测试见红再修，推迟回调的复现随之全绿；首次 build 定位的变异不再被掩盖，直接红在两条测试上。
+   第一版的起始尺寸取 `getBoundingClientRect`，CI 上 transform 那条又红了一次（run 38212512796）：祖先缩放时它与 ResizeObserver 的布局尺寸对不上，照样多出一次信号。
+   改为取计算样式（content-box 补上内边距与边框；计算样式里的内边距是声明值、布局按 1/64px 对齐，实测相加差 0.012px，所以留 0.1px 容差），补「transform / 小数宽度 / 两种 box-sizing 下都只建一次」三条测试先见红；
+   ResizeObserver 回调推迟 300ms 的压力复现两内核全绿，5 条变异两内核全红。
 
 ## 需要 Hubery 拍板的事
 

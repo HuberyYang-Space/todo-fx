@@ -353,6 +353,23 @@ describe('重建', () => {
     expect(warn).not.toHaveBeenCalled()
   })
 
+  it.for([
+    ['祖先带 transform: scale', 'transform: scale(0.5); transform-origin: 0 0;', ''],
+    ['标题宽度带小数、box-sizing: border-box 加内边距', '', 'width: 300.37px; box-sizing: border-box; padding: 3.3px 7.1px; border: 1.5px solid;'],
+    ['标题宽度带小数、content-box 加内边距与边框', '', 'width: 300.37px; padding: 3.3px 7.1px; border: 1.5px solid;'],
+  ] as const)('%s 时也只建一次（首次回调的尺寸要按布局尺寸比，不能拿屏幕上量到的比）', async ([, boxStyle, headingStyle]) => {
+    const box = document.createElement('div')
+    box.style.cssText = boxStyle
+    target.heading.before(box)
+    box.append(target.heading)
+    target.heading.style.cssText += headingStyle
+    cleanups.push(() => box.remove())
+    const { log } = start()
+    await expect.poll(painted).toBe('transparent')
+    await nextFrames(10)
+    expect(log.calls.filter(c => c === 'build')).toHaveLength(1)
+  })
+
   it.for(['resize', 'fonts'] as const)('%s 信号触发重建', async (source) => {
     const { log } = start({ debug: true })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})

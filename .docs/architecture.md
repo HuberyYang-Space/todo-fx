@@ -136,7 +136,7 @@ interface FrameState {
 | `text-raster` | 运行时 | 把 DOM 文字画进离屏 canvas 并与 DOM 精确对齐：字体、`letterSpacing`、按 `fontBoundingBoxAscent` 定基线、dpr、padding。以 `HeroTitle` 修好的写法为准；`text-transform` 的 `uppercase` / `lowercase` / `capitalize` 自己做（canvas 不认这条 CSS），capitalize 的分词按 Chromium、WebKit 实测（连字符后大写，撇号、数字、下划线后不大写） | 只画一行（折行由 `gate` 负责休眠）。font 简写只拼 `weight size family`，斜体不进纹理（阶段 1 遗留问题） |
 | `color-probe` | 运行时 | [`design.md`](design.md) 第九节的颜色继承与 canvas 回读。参数表里类型为颜色的参数，每个一个隐藏的探针 span（canvas 不兼做探针），每帧解析一次，放进 `FrameState.colors`；颜色行可写 `fallback`（`accent` 没传时取 `color` 的值） | 见第九节。非法颜色串的赋值会被浏览器忽略、留下上一个值（三内核实测），所以每次先清空再赋值 |
 | `pointer` | 运行时 | 监听 window 的 `mousemove`，给出画布内坐标、速度、靠近度；按 `enterRadius` 和 `wakeSpeed` / `calmSpeed` 把靠近度平滑成 `hover` | — |
-| `rebuild-watcher` | 运行时 | resize、ResizeObserver、dpr、字体 `loadingdone`、文本变化（MutationObserver），每个信号都回调运行时，合并由运行时负责（第三节）；ResizeObserver 的回调比对 border box 尺寸，没变就不算信号（首次回调总会来，不比对的话每次开播多建一次纹理，慢机器上还会晚于首帧到达）；`debug` 开启时打印每次重建合并进来的触发源 | ResizeObserver 必须挂在 `textEl` 的父元素上：规范跳过 inline 的非替换元素，挂在 span 上等于没挂（`HeroTitle` 的注释记录过） |
+| `rebuild-watcher` | 运行时 | resize、ResizeObserver、dpr、字体 `loadingdone`、文本变化（MutationObserver），每个信号都回调运行时，合并由运行时负责（第三节）；ResizeObserver 的回调比对 border box 布局尺寸，没变就不算信号（首次回调总会来，不比对的话每次开播多建一次纹理，慢机器上还会晚于首帧到达）；起始尺寸取计算样式而不是 `getBoundingClientRect`（祖先 transform 会让后者对不上）；`debug` 开启时打印每次重建合并进来的触发源 | ResizeObserver 必须挂在 `textEl` 的父元素上：规范跳过 inline 的非替换元素，挂在 span 上等于没挂（`HeroTitle` 的注释记录过） |
 | `loop` | 运行时 | raf 与 dt 夹取（上限 1/30 秒） | — |
 | `gl-lifecycle` | 运行时 | 直接监听 canvas 上的 `webglcontextlost` / `webglcontextrestored`，丢失时 `preventDefault()`；不持有 GL 句柄，不 import ogl | 2D 画布永远收不到这两个事件，天然不生效。超出同页上下文上限被挤掉的上下文，即使 `preventDefault()` 也不会恢复（Chromium、WebKit 实测），那个实例稳定停在真文本 |
 | `approach` | 纯计算 | 指数逼近，帧率无关 | — |
