@@ -59,9 +59,9 @@ CI 全绿：dev 上 run 35950631877、main 上 run 35951134904）。**下面的�
 - [ ] **CI 里 Firefox 用 headed 是否必需**：CI 实测 headless 的 firefox-touch 在 xvfb 下也建得出 WebGL（run 35950071354），默认 Firefox instance 的
   `headless: !process.env.CI` 可能不必要。在 CI 上去掉它（Firefox 全部 headless、仍在 `xvfb-run` 下）看探针；再试一次不套 `xvfb-run`，
   确定到底是 headed 还是 display 在起作用，据此简化配置并改正 [`tech-stack.md`](tech-stack.md) 第六、九节与 [`vitest.config.ts`](../vitest.config.ts) 的注释
-- [ ] **tech-stack 第一节「tsdown 生成 d.ts 依赖 TS 编译器 API」待核实**：调研时读 rolldown-plugin-dts 0.28.6 源码发现它在 TS 7 下会改用 tsgo，
+- [x] **tech-stack 第一节「tsdown 生成 d.ts 依赖 TS 编译器 API」待核实**：调研时读 rolldown-plugin-dts 0.28.6 源码发现它在 TS 7 下会改用 tsgo，
   tsdown 0.23.0 的 typescript peer 也包含 `^7.0.0`，这条锁 TS 6 的理由对 tsdown 可能不成立（vue-tsc 与 typescript-eslint 两条理由不受影响）。
-  只读过源码、没实跑，核实后改正那一行
+  只读过源码、没实跑，核实后改正那一行（2026-10-12 实跑：TS 7.0.2 下走 tsgo，d.ts 与 TS 6 逐字节一致，这条理由对 tsdown 不成立，已改正；锁 6 的结论不变）
 - [ ] **CLAUDE.md 候选（需 Hubery 同意）**：触发式索引补一行「写浏览器测试或新增自定义 command 之前 → [`tech-stack.md`](tech-stack.md) 第六节 →
   否则依赖宿主系统默认的媒体状态，只在 CI 的 WebKit 上红」
 

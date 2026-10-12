@@ -13,7 +13,7 @@
 
 | 事实 | 怎么核实的 | 结论 |
 | :--- | :--- | :--- |
-| TypeScript `latest` 是 7.0.2，但它**没有编译器 API** | 装 ts7 与 ts6 对照：ts7 的 `require('typescript')` 只导出 `version`、`versionMajorMinor`，`createProgram` 为 `undefined`；ts6.0.3 为 `function` | vue-tsc（Volar）、typescript-eslint（peer `>=4.8.4 <6.1.0`）、tsdown 生成 d.ts 都依赖这套 API → 锁 6 |
+| TypeScript `latest` 是 7.0.2，但它**没有编译器 API** | 装 ts7 与 ts6 对照：ts7 的 `require('typescript')` 只导出 `version`、`versionMajorMinor`，`createProgram` 为 `undefined`；ts6.0.3 为 `function` | vue-tsc（Volar）、typescript-eslint（peer `>=4.8.4 <6.1.0`）都依赖这套 API → 锁 6。tsdown 0.23.0 不受影响：装了 TS 7.0 时 rolldown-plugin-dts 0.28.6 自动改用 tsgo 生成 d.ts（2026-10-12 在隔离目录实测 7.0.2，两个入口的 d.ts 与 TS 6.0.3 走 tsc 的产物逐字节一致）；但它按版本前缀 `"7.0"` 判断，TS 7.1 会退回编译器 API 路径而失败，将来迁移时先看它是否跟进 |
 | pnpm 12 仍有 1 天的默认发布冷却期 | 同一范围 `@cloudflare/workers-types@^5.20260901.0`：pnpm 11.27.1 与 12.5.1 在默认配置下都跳过 6 小时前发布的 `5.20260923.1`、装了 30 小时前的 `5.20260922.1`；显式写 `minimumReleaseAge: 1440` 结果相同 | 与 11 一致。另外：默认配置下，**精确版本号**即使不足 1 天也会被装上（宽松回退），显式配置后才严格拦截 |
 | pnpm 12 对 workspace 里的未知键直接报错 | 锁定 `pnpm@12.5.1` 的项目里写一个拼错的 `minimumReleaseAg`，install 报错退出 | 拼错的配置不会再悄悄失效。**但 `ignoredBuiltDependencies` 被接受却完全不起作用**（写了 esbuild 照样 `ERR_PNPM_IGNORED_BUILDS`；v11 起由 `allowBuilds` 取代），不要照抄 todo-scripts 的这一键。本项目依赖树里没有带构建脚本的包，workspace 不写任何构建相关的键 |
 | attw 的 `esm-only` 档会忽略 node10 解析 | attw 源码 `profiles.ts`：`"esm-only": { ignoreResolutions: ["node10", "node16-cjs"] }` | attw 不再检查 node10，改由 README 写明。实测更严重：纯 ESM 下 tsdown 不写 `main` / `types`，node10 连根入口 `.` 都解析不到，不只是 `./vue` |
