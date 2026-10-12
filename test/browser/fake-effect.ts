@@ -11,6 +11,8 @@ export interface FakeControl {
   throwIn: 'setup' | 'build' | 'frame' | null
   /** 下一帧在 frame 里忙等这么多毫秒，制造一次长帧 */
   stallMs: number
+  /** build 时让上下文丢失（模拟上下文在首帧之前被挤掉） */
+  loseInBuild: boolean
 }
 
 export interface FakeLog {
@@ -39,7 +41,7 @@ function visibility(canvas: HTMLCanvasElement): 'shown' | 'hidden' {
  */
 export function createFakeEffect(textEl: HTMLElement): { create: typeof fake.create, log: FakeLog, control: FakeControl } {
   const log: FakeLog = { calls: [], rasters: [], frames: [], colorAtHook: [], canvasAtHook: [], placementAtBuild: [], frameTimes: [] }
-  const control: FakeControl = { setupReturnsNull: false, throwIn: null, stallMs: 0 }
+  const control: FakeControl = { setupReturnsNull: false, throwIn: null, stallMs: 0, loseInBuild: false }
   const record = (call: string): void => {
     log.calls.push(call)
     log.frameTimes.push(document.timeline.currentTime)
@@ -65,6 +67,8 @@ export function createFakeEffect(textEl: HTMLElement): { create: typeof fake.cre
           log.rasters.push(raster)
           if (control.throwIn === 'build')
             throw new Error('build 故意抛错')
+          if (control.loseInBuild)
+            gl.getExtension('WEBGL_lose_context')!.loseContext()
         },
         frame(state) {
           record('frame')

@@ -289,6 +289,23 @@ describe('休眠条件逐个进出', () => {
   })
 })
 
+describe('上下文在首帧之前丢失', () => {
+  it('lost 事件还没到时，交接前查 isContextLost()：不涂透明、不露画布、不画', async () => {
+    // 模拟 WebKit：上下文已经丢了，lost 事件要晚一帧才派发——在祖先上的捕获阶段把事件拦下，运行时收不到
+    const block = (event: Event): void => event.stopPropagation()
+    target.layerEl.addEventListener('webglcontextlost', block, true)
+    cleanups.push(() => target.layerEl.removeEventListener('webglcontextlost', block, true))
+    const fake = createFakeEffect(target.textEl)
+    fake.control.loseInBuild = true
+    const instance = fake.create(target.textEl, target.layerEl)!
+    cleanups.push(() => instance.destroy())
+    await nextFrames(5)
+    expect(fake.log.calls).toEqual(['setup', 'build'])
+    expect(painted()).toBe('')
+    expect(shown()).toBe(false)
+  })
+})
+
 describe('重建', () => {
   it('休眠中不重建：只记着，恢复时建一次，用的是最新的文字', async () => {
     const { instance, log } = start()
