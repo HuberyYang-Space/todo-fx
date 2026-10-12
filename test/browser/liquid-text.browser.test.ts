@@ -1,7 +1,7 @@
-import type { LiquidTextOptions } from '../../src/effects/liquid-text'
+import type { LiquidTextOptions } from '../../src/index'
 import type { MountedHeading } from './helpers'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createLiquidText } from '../../src/effects/liquid-text'
+import { createLiquidText } from '../../src/index'
 import { mountHeading, nextFrames, readPixels } from './helpers'
 
 // 液态版只测自己的渲染（architecture.md 第九节）；时序由 runtime 的测试管。

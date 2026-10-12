@@ -30,6 +30,16 @@ async function bundle(root: string, specifier: string, name: string): Promise<st
 
 const OGL_REGION = /^\/\/#region (?:.*\/)?node_modules\/ogl\//m
 
+describe('真实入口', () => {
+  // 对照：ogl 被误打进 dist 时 dist 里只剩一份内联副本、没有 node_modules/ogl 的 region，阶段 3 那条「没有 ogl」会假绿，
+  // 唯一会红的就是这一条。阶段 3 加主断言（只 import particle-text 时没有 ogl）
+  it('对照：import createLiquidText 的打包结果里有 ogl', async () => {
+    const root = fileURLToPath(new URL('../..', import.meta.url))
+    const entry = fileURLToPath(new URL('../../dist/index.js', import.meta.url))
+    expect(await bundle(root, entry, 'createLiquidText')).toMatch(OGL_REGION)
+  })
+})
+
 describe('ogl 产物断言的判据（探针包）', () => {
   const root = fileURLToPath(new URL('./fixtures/ogl-probe', import.meta.url))
 

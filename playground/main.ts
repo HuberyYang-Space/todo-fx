@@ -1,3 +1,4 @@
+import { createLiquidText } from '@huberyyang/todo-fx'
 import { hostFixtures } from './fixtures/index'
 
 const app = document.querySelector<HTMLElement>('#app')!
@@ -10,7 +11,10 @@ if (fixture) {
   const toolbar = document.createElement('div')
   const stage = document.createElement('div')
   app.append(heading, toolbar, stage)
-  const { actions } = fixture.mount(stage)
+  const { targets, actions } = fixture.mount(stage)
+  // debug：在控制台看休眠、恢复与重建的原因；accent 用 my-blog 亮色主题的 --c-primary，与首页现状对照
+  for (const { textEl, layerEl } of targets)
+    createLiquidText(textEl, layerEl, { accent: '#2b7a6f', debug: true })
   for (const [label, run] of Object.entries(actions)) {
     const button = document.createElement('button')
     button.type = 'button'
