@@ -2,6 +2,8 @@
 
 > 2026-09-23 · **架构设计已落定**。设计方案见 [`design.md`](design.md)，技术选型见 [`tech-stack.md`](tech-stack.md)
 > 2026-09-24 · 阶段 0 落地：第五节 `gate` 补媒体查询的读法，第八节补齐依赖方向规则
+> 2026-10-12 · 阶段 1 落地（实现计划见 [`plans/2026-10-12-phase-1-runtime-liquid-text.md`](plans/2026-10-12-phase-1-runtime-liquid-text.md)）：第三节时序改为「重建在 raf 回调里紧接着画」、
+> 涂透明与画布可见性同进同退；第四节 `pointer` 加 `moved`；第五节 `layer`、`color-probe`、`rebuild-watcher`、`gl-lifecycle` 按实测修订；第六节公共参数的覆盖改为同名键重写
 > 这里定的是**代码怎么组织、运行时怎么调度特效、对外暴露什么**。文中的类型签名是契约，不是最终代码。
 >
 > 写法约定同 [`design.md`](design.md)：每条决定都写风险。
@@ -57,12 +59,14 @@ create(textEl, layerEl, options?)
  └─ evaluate()                        ← 任何信号到来，都只调这一个函数
 
 evaluate()：shouldRun = 所有休眠条件都不成立
- ├─ 该播且没在播 → 有待重建就先 raster + build → 启动 raf → 首帧 frame 成功之后才涂透明
- └─ 不该播且正在播 → 停 raf → 撤掉涂透明
+ ├─ 该播且没在播 → 有待重建就先 raster + build → 启动 raf → 首帧 frame 成功之后才涂透明并露出画布
+ └─ 不该播且正在播 → 停 raf → 撤掉涂透明并藏起画布
 
-重建信号（按帧合并）→ 重新测量文字 → evaluate()（宽度和折行可能变了）
- ├─ 正在播 → 立即 raster + build
- └─ 休眠中 → 只标记「待重建」，恢复时再做
+重建信号 → 标记「待重建」→ evaluate()（宽度和折行可能变了，同步重算）
+ ├─ 正在播 → 下一次 raf 回调里先 raster + build、紧接着 frame（同一帧里的多个信号自然合并成一次）
+ └─ 休眠中 → 只留着标记，恢复时再做
+
+raf 回调（tick）：有待重建就先 build → frame → 首帧之后涂透明
 ```
 
 整个运行时只有一个布尔值 `running`，外加一个幂等的 `evaluate()`：这就是 [`design.md`](design.md) 第十一节要求的
@@ -75,6 +79,10 @@ evaluate()：shouldRun = 所有休眠条件都不成立
 | **休眠中不重建**：只标记「待重建」，恢复时再 build | 挂在隐藏容器里时宽度为 0，本来就建不了纹理；reduced-motion 用户永远不会恢复，不该为他们反复重画纹理 | 恢复的那一帧多做一次 build；好在首帧画完才涂透明，用户看到的仍是真文本，不会空白 |
 | **上下文恢复时依次调用 `dispose` → `setup` → `build`；destroy 时由运行时对 canvas 调 `WEBGL_lose_context` 的 `loseContext()`** | 重新 setup 能保证全部 GL 资源重建，恢复后 ogl 再调 `getContext` 拿到的就是那个已恢复的上下文。destroy 时主动释放，不用等垃圾回收，不再占着同页约 16 个的上下文名额；2D 画布在这一步什么都拿不到，天然跳过 | 恢复时 `setup` 若返回 `null`，实例会一直停在真文本（与 [`design.md`](design.md) 第十一节的既定风险一致） |
 | **涂透明的时机**：首次 `frame` 成功返回之后，在同一帧内完成 | 真文本与画布在同一帧交接，没有两边都看不见的空隙，也没有重影 | 比「首张纹理建成前绝不涂透明」更严，没有额外风险 |
+| **画布显隐与涂透明同进同退**（阶段 1 补）：画布建出来先 `display: none`，涂透明时露出、撤掉涂透明时藏起 | 真实 Chrome 里实测：休眠只撤涂透明的话，WebGL 画布停在最后一帧、和真文本叠成重影（折行休眠时最明显）；超出上下文上限被挤掉的画布会画成不透明的白块，把真文本和上方内容一起盖住。用 `display` 不用 `visibility`（终审实测）：显式写 `visible` 会盖过宿主祖先的 `visibility: hidden`（弹层收起了画布还悬着）；`hidden` 的画布仍算进滚动溢出，ogl 一构造就写上 300×150，触屏用户一开始就休眠，标题末尾被撑出横向滚动 | 画布的 inline `display` 归运行时管，宿主改不了；首次 build 时画布还 `display: none`、`offsetParent` 为 null，定位基准要从挂载点取（第五节 `layer`） |
+| **交接前确认上下文还在**（阶段 1 终审补）：首帧涂透明之前查一次 `isContextLost()`，已丢就按上下文丢失休眠 | WebKit 里被挤掉的上下文 `isContextLost()` 先变 true、`webglcontextlost` 事件下一帧才到，不查的话这一帧文字已涂透明、画布却画不出东西 | 只在首帧交接前查，之后仍靠事件 |
+| **重建放在 raf 回调里、紧接着 `frame`**（阶段 1 补），信号到来时只标记并同步重新判定 | 重建要改画布尺寸，改尺寸会清空画布；在事件回调里重建、下一帧才画的话，中间会合成出一帧空白。放进同一个回调，「按帧合并」也自然成立，不需要单独的合并器 | 判定（`evaluate`）仍随每个信号同步跑一次，窗口拖动时每个 resize 事件都会读一次布局，量级与原实现相同 |
+| **create 时 `setup` 抛错**：撤掉画布、`console.error` 一次、返回 `null`（阶段 1 补） | 此时实例还不存在，返回 `null` 让调用方拿到的仍是「真文本」这一种结果；其余钩子抛错照上面熔断 | 调用方从返回值上分不清「不支持」和「setup 出错」，要看控制台 |
 
 ## 四、钩子契约
 
@@ -108,13 +116,15 @@ interface FrameState {
   dt: number // 秒，已夹取
   time: number // 累计秒数
   hover: number // 0~1：靠近度经快慢不对称的逼近后的值
-  pointer: { x: number, y: number, vx: number, vy: number } // 画布内的 CSS 像素；速度为 CSS 像素 / 秒
+  pointer: { x: number, y: number, vx: number, vy: number, moved: boolean } // 画布内的 CSS 像素；速度为 CSS 像素 / 秒；moved：上一帧之后有没有新事件
   colors: Record<string, [number, number, number, number]> // 每个颜色类参数本帧的解析值，0~1，含 alpha
 }
 ```
 
 `pointer` 如实保留原实现的语义：速度按原写法逐事件计算，dt 下限 14ms。粒子版只用坐标，液态版用速度
 （原实现按 uv 计算，换算成 CSS 像素后等价）。手感差异由阶段 1、3 的判据验出。
+`moved` 是阶段 1 加的：液态版的速度要「事件来时覆盖、每帧衰减 0.92」，不知道有没有新事件就只能每帧覆盖成同一个值，速度永远衰减不下去。
+`FrameState`、`SetupContext`、钩子类型都不导出（除测试外没有消费方），测试从钩子签名里取。
 
 ## 五、共享件
 
@@ -122,16 +132,16 @@ interface FrameState {
 | :--- | :--- | :--- | :--- |
 | `define-effect` | 运行时 | 运行时本体：装配下面各件，独占第三节的全部时序 | 见第二节 |
 | `gate` | 运行时 | 必需 API 清单检测（[`design.md`](design.md) 第十一节）；休眠判定函数及其信号：`prefers-reduced-motion`、`hover: none`、`forced-colors` 三个媒体查询，文字宽度为 0，文字折行，上下文丢失 | 折行判定用 `textEl.getClientRects()` 多于一个矩形，只在 `textEl` 是 inline 元素时成立 —— 壳渲染的正是 inline span；裸用内核的人要在类型注释里看到这条要求。媒体查询的当前状态要读新建的 `matchMedia(q).matches`，被监听的 `MediaQueryList` 只当信号源：Chromium 里在 change 事件派发前读它的 `.matches`，forced-colors 的 change 事件会被吞掉（阶段 0 实测），退出强制色后收不到恢复信号 |
-| `layer` | 运行时 | 在挂载点里建 canvas；负责尺寸（文字外框加四周 `padding`）、dpr、按实测偏移定位（相对 canvas 的 offsetParent）；inline 写 `max-width: none`、`pointer-events: none`、`aria-hidden` | 定位基准要求壳的根元素有定位上下文（壳设 inline `position: relative`，见 [`design.md`](design.md) 第八节）；裸用内核的人要自己提供 |
-| `text-raster` | 运行时 | 把 DOM 文字画进离屏 canvas 并与 DOM 精确对齐：字体、`letterSpacing`、按 `fontBoundingBoxAscent` 定基线、dpr、padding。以 `HeroTitle` 修好的写法为准 | 只画一行（折行由 `gate` 负责休眠） |
-| `color-probe` | 运行时 | [`design.md`](design.md) 第九节的颜色继承与 canvas 回读。参数表里类型为颜色的参数，每帧解析一次，放进 `FrameState.colors` | 见第九节 |
+| `layer` | 运行时 | 在挂载点里建 canvas；负责尺寸（文字外框加四周 `padding`）、dpr、按实测偏移定位（相对 canvas 的 offsetParent）；inline 写 `max-width: none`、`pointer-events: none`、`aria-hidden`、初始 `display: none`（第三节）；画布的 CSS 尺寸与像素尺寸都只归它设。量到的屏幕坐标按定位基准的缩放换算回布局坐标（基准的 `getBoundingClientRect` 与 `offsetWidth` 之比，差不到半像素当作没缩放）：祖先带 `transform: scale` 时画布在同一个变换里会被再缩一次，而 ResizeObserver 不响应 transform，入场动画中途建错的尺寸永远不会被纠正；`pointer` 同样换算 | 定位基准要求壳的根元素有定位上下文（壳设 inline `position: relative`，见 [`design.md`](design.md) 第八节）；裸用内核的人要自己提供。特效不要再改画布尺寸：ogl 的 `renderer.setSize` 会把 inline 宽高改写成取整后的值，液态版改为直接设 `renderer.width` / `height` / `dpr` |
+| `text-raster` | 运行时 | 把 DOM 文字画进离屏 canvas 并与 DOM 精确对齐：字体、`letterSpacing`、按 `fontBoundingBoxAscent` 定基线、dpr、padding。以 `HeroTitle` 修好的写法为准；`text-transform` 的 `uppercase` / `lowercase` / `capitalize` 自己做（canvas 不认这条 CSS），capitalize 的分词按 Chromium、WebKit 实测（连字符后大写，撇号、数字、下划线后不大写） | 只画一行（折行由 `gate` 负责休眠）。font 简写只拼 `weight size family`，斜体不进纹理（阶段 1 遗留问题） |
+| `color-probe` | 运行时 | [`design.md`](design.md) 第九节的颜色继承与 canvas 回读。参数表里类型为颜色的参数，每个一个隐藏的探针 span（canvas 不兼做探针），每帧解析一次，放进 `FrameState.colors`；颜色行可写 `fallback`（`accent` 没传时取 `color` 的值） | 见第九节。非法颜色串的赋值会被浏览器忽略、留下上一个值（三内核实测），所以每次先清空再赋值 |
 | `pointer` | 运行时 | 监听 window 的 `mousemove`，给出画布内坐标、速度、靠近度；按 `enterRadius` 和 `wakeSpeed` / `calmSpeed` 把靠近度平滑成 `hover` | — |
-| `rebuild-watcher` | 运行时 | resize、ResizeObserver、dpr、字体 `loadingdone`、文本变化（MutationObserver），按帧合并成一次重建；`debug` 开启时打印触发源 | ResizeObserver 必须挂在 `textEl` 的父元素上：规范跳过 inline 的非替换元素，挂在 span 上等于没挂（`HeroTitle` 的注释记录过） |
+| `rebuild-watcher` | 运行时 | resize、ResizeObserver、dpr、字体 `loadingdone`、文本变化（MutationObserver），每个信号都回调运行时，合并由运行时负责（第三节）；`debug` 开启时打印每次重建合并进来的触发源 | ResizeObserver 必须挂在 `textEl` 的父元素上：规范跳过 inline 的非替换元素，挂在 span 上等于没挂（`HeroTitle` 的注释记录过） |
 | `loop` | 运行时 | raf 与 dt 夹取（上限 1/30 秒） | — |
-| `gl-lifecycle` | 运行时 | 直接监听 canvas 上的 `webglcontextlost` / `webglcontextrestored`，丢失时 `preventDefault()`；不持有 GL 句柄，不 import ogl | 2D 画布永远收不到这两个事件，天然不生效 |
+| `gl-lifecycle` | 运行时 | 直接监听 canvas 上的 `webglcontextlost` / `webglcontextrestored`，丢失时 `preventDefault()`；不持有 GL 句柄，不 import ogl | 2D 画布永远收不到这两个事件，天然不生效。超出同页上下文上限被挤掉的上下文，即使 `preventDefault()` 也不会恢复（Chromium、WebKit 实测），那个实例稳定停在真文本 |
 | `approach` | 纯计算 | 指数逼近，帧率无关 | — |
 | `proximity` | 纯计算 | 点到矩形的最短距离，换算成 0~1 的靠近度 | — |
-| `params` | 纯计算 | 参数表派生：选项类型、默认值（含公共参数的覆盖）、合并、`undefined` 恢复默认、按键名路由到 patch 或重建、选项类型映射 | — |
+| `params` | 纯计算 | 参数表派生：选项类型、默认值、合并、`undefined` 恢复默认、按键名路由到 patch 或重建、选项类型映射 | 对象类参数（`flowmap`）patch 时没传的子项回到默认值，不保留上一次的值（与「`undefined` 恢复默认」同一语义）；表里没有的键、原型链上的键名一律忽略 |
 | `particles` | 纯计算 | 采样、轨迹衰减、斥力、归位目标，由 my-blog 的 `hero-particles.ts` 原样搬入 | — |
 
 ## 六、参数
@@ -151,8 +161,9 @@ interface FrameState {
 | 决定 | 理由 | 风险 |
 | :--- | :--- | :--- |
 | 公共参数由运行时定义一次 | 这些参数全部由共享件消费，写在各特效里就是重复 | 强制统一命名：粒子版的「发散 / 合拢速度」改叫 `wakeSpeed` / `calmSpeed`，语义稍绕 |
-| 特效可以覆盖公共参数的默认值 | 搬过来的行为原样保持，代价只是参数表里多一个覆盖字段 | 同名参数在两个特效里默认值不同，读文档的人可能意外 |
+| 特效可以覆盖公共参数的默认值：在自己的参数表里用同名键重写那一行（如 `calmSpeed: { ...commonParams.calmSpeed, default: 2.6 }`），运行时按 `{ ...commonParams, ...params }` 合并（阶段 1 定） | 搬过来的行为原样保持；不需要专门的覆盖机制 | 同名参数在两个特效里默认值不同，读文档的人可能意外 |
 | `debug` 做成参数 | 第二节「打印触发源」需要一个开关；同时回应第六节「排查为什么没效果只能靠 devtools」的风险 | 每个特效多一个参数；消费方忘了关会在线上打印日志（默认是关的） |
+| `debug` 日志走 `console.warn`，前缀 `[todo-fx]`（阶段 1 定）；`maxDpr` 不是正数时按 1 | lint（antfu）只放行 `warn` / `error`；0 尺寸画布画不出东西、文字却照样涂透明，标题会隐身 | 日志在控制台里是黄色警告，比 info 显眼 |
 
 ### 特效参数表
 

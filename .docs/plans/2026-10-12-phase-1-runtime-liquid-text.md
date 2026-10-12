@@ -20,6 +20,33 @@ my-blog 的 [`HeroTitle.vue`](https://github.com/HuberyYang-Space/my-blog/blob/2
 
 ---
 
+## 执行偏离（2026-10-12，执行后补记）
+
+本计划已执行完毕，以仓库现状为准；正文里对应的旧段落不再逐处改写：
+
+1. **拍板结果**：一采纳（液态版关掉混合）；二选 B（claude-in-chrome 按 DOM 状态与 console 验，手感由 Hubery 肉眼看）；三、四、五同意；执行方式本会话直接执行。
+2. **modern-colors 夹具不折行的改动从任务 5 挪到任务 3**：任务 3 的颜色测试就依赖它（长颜色串在测试 iframe 里折行 → 休眠 → 没有帧）。
+3. **CI 第一次红在 quality 的类型检查**（run 38195255471；browser 与 min-peer 绿，Firefox 首次跑全过）：playground 按包名导入内核，
+   类型解析经包自引用落到 `dist`，CI 先类型检查、还没有 dist 就 TS2307；本地因为有旧 dist 没暴露。删掉 dist 后本地复现，tsconfig 加 `paths` 把包名指向 `src`（提交 554f083）。
+4. **任务 7 在真实 Chrome 里发现的缺陷**（提交 03d3829）：休眠只撤涂透明、画布还停在最后一帧 —— 折行夹具里真文本与旧画面叠成重影；
+   many-instances 里被挤掉上下文的两块画布画成不透明的白块，盖住真文本和上方说明。把被挤掉的画布藏起来再截图做 A/B，确认是画布本身。
+   修法：画布初始 `visibility: hidden`，与涂透明同进同退。先补测试 20 条红，修后全绿；3 条变异（休眠不藏、开播不露、初始不藏）均红；Chrome 里复核正常。
+   计划阶段的干跑与自动化测试都没抓到它：测试只断言了涂透明，没断言画布可见性 —— 又一次「断言了规则存在，没断言它作用在谁身上」。
+5. **任务 7 的验收方式**：playground 所在标签页在后台（`visibilityState: hidden`），raf 不跑；截图会推一帧，所以用截图推帧、以 DOM 状态与 console 为结论，截图只作辅助。
+   已验：clamp-font（画布偏移恰为 padding、dpr 1.8 下像素尺寸正确）、reset-canvas（画布宽 204 vs 文字 108，没被压扁）、modern-colors（4 个都接管、不折行）、
+   many-instances（[0,1] 停在真文本且画布隐藏，其余接管）、narrow-wrap 与 hidden-container（休眠 / 恢复日志与操作对应）、theme-transition（切换后接管不断）。
+   窗口尺寸变化时日志打出过「重建：resize、dpr」，dpr 信号在真实窗口里触发过。手感一致性（流动、色差、余韵、醒来与静下的速度、边缘粗细）留给 Hubery 对照。
+6. **执行脚本**：`task-start` / `task-done` 按英文「Task N」找标题，本计划用「任务 N」，改为手写账本行。
+7. **CI**：修复后 dev 上 run 38195756526 三个 job 全绿（browser 36 个文件，含 Firefox 与三个 touch instance）。
+8. **终审**（opus，独立上下文）：Critical 2、Important 2、Minor 7。重新定级后把 WebKit 的挤占竞态（标题隐身一帧）由 Minor 上调为 Important。逐条先写测试见红再修：
+   - Critical：03d3829 给画布显式写 `visibility: visible`，盖过了宿主祖先的 `visibility: hidden`；`visibility: hidden` 的画布仍算进滚动溢出，
+     休眠中（触屏用户一开始就是）从没 build 过的画布带着 ogl 写的 300×150 撑出横向滚动。改用 `display: none`，定位基准从挂载点取（9dbd235）。
+     首次 build 定位的变异起初是绿的（被 ResizeObserver 首次回调触发的第二次 build 掩盖），补了「每次 build 定位一致」的断言后才红。
+   - Important：祖先 `transform: scale` 时按布局尺寸建画布、指针坐标同步换算（5cbcf1c）；`text-transform` 画进纹理（108eb93，capitalize 分词先在两个内核里实测）；
+     首帧交接前查 `isContextLost()`（d2fe8e5）。竞态的夹具测试依赖机器负载（单跑 WebKit 抓不到），另补一条在祖先捕获阶段拦下 lost 事件的确定性测试（两内核变异均红）。
+   - Minor 记入 [`todo.md`](../todo.md)「阶段 1 遗留问题」。
+   - 修完本地门禁 30 个文件 308 条全过；原有的运行时 38 条、液态版 9 条变异重跑仍全红。
+
 ## 需要 Hubery 拍板的事
 
 ### 一、液态版关掉混合（行为变化，建议采纳）

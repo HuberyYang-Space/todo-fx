@@ -70,19 +70,20 @@ CI 全绿：dev 上 run 38187868745），**阶段 0 关闭**。
 
 > 开工前先确认上面的「阶段 0 遗留问题」已全部勾掉。
 
-- [ ] **纯计算层**：`approach`（连同 my-blog 的 `animation.test.ts` 一起迁）、`proximity`、`params`（派生、公共参数覆盖、
+- [x] **纯计算层**：`approach`（连同 my-blog 的 `animation.test.ts` 一起迁）、`proximity`、`params`（派生、公共参数覆盖、
   `undefined` 恢复默认、按键名路由、选项类型映射）—— [`architecture.md`](architecture.md) 第五、六节
-- [ ] **共享件**：`loop`、`layer`、`text-raster`（以 `HeroTitle` 修好的对齐写法为准）、`color-probe`、`pointer`、`rebuild-watcher`、
+- [x] **共享件**：`loop`、`layer`、`text-raster`（以 `HeroTitle` 修好的对齐写法为准）、`color-probe`、`pointer`、`rebuild-watcher`、
   `gate`、`gl-lifecycle` —— [`architecture.md`](architecture.md) 第五节
-- [ ] **运行时 `defineEffect`**：用一个假特效测全部时序（休眠条件逐个进出、首帧前不涂透明、休眠中不重建、上下文丢失与恢复的调用顺序、
+- [x] **运行时 `defineEffect`**：用一个假特效测全部时序（休眠条件逐个进出、首帧前不涂透明、休眠中不重建、上下文丢失与恢复的调用顺序、
   钩子抛错后熔断、destroy 后 raf 与监听器归零）；`debug` 的三类日志 —— [`architecture.md`](architecture.md) 第三、四、九节
-- [ ] **`liquid-text`**：参数表、shader、`setup` 先自己取上下文，取不到返回 `null`；每帧从 `ctx.params` 读值写 uniform；
+- [x] **`liquid-text`**：参数表、shader、`setup` 先自己取上下文，取不到返回 `null`；每帧从 `ctx.params` 读值写 uniform；
   改 shader 后必须在真实浏览器里验证 —— [`design.md`](design.md) 第七节、[`architecture.md`](architecture.md) 第四节
-- [ ] **公开入口 `.`**：`createLiquidText`、`liquidTextOptionTypes`、类型；tsnapi 快照 —— [`architecture.md`](architecture.md) 第七节
-- [ ] **不迁 `hero-title.test.ts`**：它读源码与样式表文本，断言了规则存在，却没断言规则作用在谁身上；由宿主场景夹具里的行为测试取代
+- [x] **公开入口 `.`**：`createLiquidText`、`liquidTextOptionTypes`、类型；tsnapi 快照 —— [`architecture.md`](architecture.md) 第七节
+- [x] **不迁 `hero-title.test.ts`**：它读源码与样式表文本，断言了规则存在，却没断言规则作用在谁身上；由宿主场景夹具里的行为测试取代
   （reset 压画布、颜色过渡停在旧主题）
 
 阶段 0 留下的注意事项：
+（以下四条已在阶段 1 全部落实）
 - **门控**：媒体查询的当前状态读新建的 `matchMedia(q).matches`（见 [`architecture.md`](architecture.md) 第五节 `gate`）。
 - **测试基线**：`test/browser/setup.ts` 在每个测试文件与每条用例开始前把媒体仿真设回 `no-preference` / `none`；测休眠条件时显式仿真，不要依赖宿主默认值（CI 的 Linux WebKit 默认就是 reduced-motion）。
 - **产物断言**：`test/artifact/no-ogl.test.ts` 加真实入口的对照：`import createLiquidText` 的打包结果里必须有 ogl（ogl 被误打进 dist 时，唯一会红的就是它）。
@@ -90,9 +91,29 @@ CI 全绿：dev 上 run 38187868745），**阶段 0 关闭**。
 
 完成判据：playground 的宿主场景夹具里表现与 my-blog 现状一致；[`design.md`](design.md) 第十二节的内核判据通过。
 
+阶段 1 的任务已于 2026-10-12 完成（实现计划与执行偏离见 [`plans/2026-10-12-phase-1-runtime-liquid-text.md`](plans/2026-10-12-phase-1-runtime-liquid-text.md)；
+CI 全绿：dev 上 run 38195756526）。内核判据由自动化测试覆盖（三内核）；夹具表现已在真实 Chrome 里按 DOM 状态与 console 验过，
+**手感一致性（流动、色差、余韵、边缘粗细）待 Hubery 对照 my-blog 确认**。
+
+### 阶段 1 遗留问题（开阶段 2 之前必须清零）
+
+来源：阶段 1 的独立终审（Minor 级）与执行中留下的待证项。修法同样先复现再动手，修完要有证据。
+
+- [ ] **手感对照**：Hubery 并排打开 `pnpm play` 与 my-blog 首页，按 [计划任务 7 的清单](plans/2026-10-12-phase-1-runtime-liquid-text.md) 逐项看；重点是关掉混合后的边缘粗细
+- [ ] **恢复后的首帧带着休眠期间的指针事件**：[`src/runtime/pointer.ts`](../src/runtime/pointer.ts) 的 `moved` 在休眠中照样累积，恢复首帧 `moved: true`、
+  速度可达 9000（终审实测），可能在恢复瞬间打出一笔笔触。恢复时重置一次指针状态
+- [ ] **每次开播多建一次纹理**：ResizeObserver 的首次回调让第二帧再 build 一次（调用序列 `setup, build, frame, build, frame`），
+  debug 日志每次都打「重建：ResizeObserver」，排查时会误导。忽略首次回调或比对尺寸后再触发；注意它目前掩盖着「首次 build 时定位」这类错误，改完要重跑那条变异
+- [ ] **斜体不进纹理**：[`src/runtime/text-raster.ts`](../src/runtime/text-raster.ts) 的 font 简写只拼 `weight size family`。终审建议把 `fontStyle` 映射成 `italic` / `oblique`（丢掉角度），避开整条 font 赋值失效的风险
+- [ ] **根元素没有定位上下文时差一个 body margin**：`offsetParent` 退回 body，画布实际按初始包含块定位。判断基准的 `position` 是否为 `static`，是就按文档原点算；或在 README 写明要求
+- [ ] **上下文恢复时 `setup` 抛错，旧 hooks 的 `dispose` 被调两次**（[`src/runtime/define-effect.ts`](../src/runtime/define-effect.ts) 恢复处一次、熔断里一次）：被吞掉、无害，但不该发生
+- [ ] **`liquidTextOptionTypes` 目前除快照外没有消费方**：它是阶段 2 壳要用的计划导出，阶段 2 落地后自然有消费方；阶段 2 若不用它，按「零消费方一律删除」删掉
+- [ ] **capitalize 在 `.` 之后的行为两个内核不一致**（Chromium 大写、WebKit 不大写，实测）：纹理目前按 Chromium 的做法（`.` 之后大写），WebKit 上 `x.y` 这类写法会对不上。极少见，README 写明即可
+
 ## 阶段 2：Vue 壳 `<LiquidText>`
 
 - [ ] **通用工厂与组件**：props = `text` + `as` + 选项类型映射；`onMounted` 时 create、`onUnmounted` 时 destroy；props 变化交给 `patch`；
+  根元素 inline `user-select: none`（看得见的字在画布上、能选中的是透明真文本，框选会浮出对不上的选区色块；内核碰不到根元素，只能壳加，Hubery 2026-10-12 定）；
   根元素 inline `position: relative`，span、插槽、挂载点之间不留空白 —— [`design.md`](design.md) 第八节
 - [ ] **回归用例先红一次**：重渲染后 canvas 尺寸与涂透明仍在（[`design.md`](design.md) 第六节实测表的前两行）
 - [ ] **模板类型夹具**：在 `.vue` 模板里给 `strength` 传字符串，`vue-tsc` 必须报错 —— [`tech-stack.md`](tech-stack.md) 第五节

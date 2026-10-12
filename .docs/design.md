@@ -1,6 +1,6 @@
 # 特效库方案
 
-> 2026-09-24 · v9 · **设计方案、技术选型、架构设计均已落定，阶段 0（基建）已完成**（见 [`tech-stack.md`](tech-stack.md)、[`architecture.md`](architecture.md)）
+> 2026-10-12 · v10 · **设计方案、技术选型、架构设计均已落定，阶段 0（基建）与阶段 1（运行时 + liquid-text）已完成**（见 [`tech-stack.md`](tech-stack.md)、[`architecture.md`](architecture.md)）
 > 待办清单见 [`todo.md`](todo.md)（由拍板记录统一制定，拍板记录随后删除）
 > 结论：`@huberyyang/todo-fx`，单包多入口。框架无关内核 + Vue 壳；React 壳等出现第一个 React 消费方再加。
 > 首个消费方：[my-blog](https://github.com/HuberyYang-Space/my-blog)。文中实测数据均取自其提交 [`2d73f4c`](https://github.com/HuberyYang-Space/my-blog/tree/2d73f4c07366096fc899c4355088ba2c41b2c6e6)
@@ -152,6 +152,9 @@ v8 删除了公开的 `rebuild()`：`patch` 改为接受任意选项，patch 类
 | :--- | :--- | :--- |
 | `accent` 默认等于 `color` | shader 里是 `mix(uColor, uAccent, …)`，两者相等就是无高光 —— 对宿主零假设。my-blog 显式传 `accent="var(--c-primary)"` 保持现状 | 开箱效果比 my-blog 首页平淡，不看文档的人发现不了 `accent` |
 | `flowmap.*` 走 rebuild | 这三项在 ogl 里其实是 uniform，但只能经 `flowmap.mesh.program.uniforms` 这种未公开字段改，ogl 升级可能悄悄失效 | 重建 Flowmap 会清掉当前残留的笔触；它是高级参数，不会频繁改 |
+| **液态版关掉混合**（v10，Hubery 2026-10-12 定） | 画布每帧先清成全透明、只画一遍，混合唯一的作用是把 alpha 再乘一次：抗锯齿边缘变成 alpha²、比底下的真文本细一圈，半透明色 0.6 落到 0.36（实测读回 92/255）。关掉后读回 153/255，边缘与 DOM 文字一致 | 与 my-blog 现状相比，画布那份字的边缘略「粗」一点（更接近真文本）；这是阶段 1 唯一一处有意的观感差异 |
+| `flowmap` 子项 patch 时没传的回到默认值（v10） | 与「`undefined` 恢复默认」同一个语义；Vue 壳传的本来就是整个对象 | 裸用内核时 `patch({ flowmap: { alpha } })` 会把另外两项重置成默认值 |
+| `maxDpr` 不是正数时按 1（v10） | 0 尺寸画布画不出东西、文字却照样涂透明，标题隐身 | — |
 
 ## 八、Vue 壳
 
@@ -188,9 +191,10 @@ span、插槽、挂载点之间不留空白，否则渲染出的空格会把光�
 
 ## 九、颜色继承机制
 
-1. 探针建在挂载点里（内核独占，框架不碰）。canvas 本身兼做 `color` 探针，`accent` 另用一个隐藏 span。
-   挂载点位于根元素内，所以探针继承的正是根元素的 color。
-2. 每帧读探针的计算 color：`color` 未传则读继承值；传了任意 CSS 颜色字符串，就设到探针上再读回。
+1. 探针建在挂载点里（内核独占，框架不碰）。每个颜色类参数一个隐藏 span（v10：canvas 不再兼做探针，一条路径处理所有颜色参数，
+   canvas 的 inline style 只归 layer 管）。挂载点位于根元素内，所以探针继承的正是根元素的 color。
+2. 每帧读探针的计算 color：`color` 未传则读继承值，`accent` 未传则取 `color` 的值；传了任意 CSS 颜色字符串，就先清空探针、再设上去读回
+   （非法串的赋值会被浏览器忽略、留下上一个值，先清空它才会回落为继承色）。
 3. **解析交给浏览器**：计算值字符串与上一帧相同就直接复用；变了就在 1×1 的 canvas 2D 上填色，
    再用 `getImageData` 读回 sRGB。不写正则，也不手写解析器。
 
@@ -212,7 +216,7 @@ Tailwind v4 的默认调色板就是 oklch —— 按开源标准，这是第一
 | 库不认识任何变量名 | `--c-primary` 是调用方传进来的字符串，对宿主零假设 | — |
 | 每帧读而非只读一次 | 主题切换只改 html 的 class，颜色带过渡，读一次会永远停在旧主题 | 有脏样式时每帧强制一次样式重算，与现状同量级（实测约 1μs / 帧） |
 | canvas 回读转 sRGB | 浏览器负责所有色彩空间转换，CSS 以后加新语法也不用跟 | 广色域被裁到 sRGB：实测 `color(display-p3 1 0 0)` 回读成 `255,0,0`（三内核一致：CI 的 Linux 三内核与 macOS 的 Chromium、WebKit 由 modern-colors 自检覆盖，macOS 的 Firefox 只有阶段 0 的干跑证据），P3 屏上特效文字会比 DOM 文字略灰。上表的计算值与回读值 v9 在 Chromium / Firefox / WebKit 上实测一致（macOS 与 CI 的 Linux 各跑一遍，见 `test/browser/host-fixtures.browser.test.ts` 的 modern-colors 自检） |
-| 颜色自带的 alpha 乘进最终 alpha | 宿主常用半透明色做「淡一档」的文字，忽略 alpha 会比 DOM 文字更深 | — |
+| 颜色自带的 alpha 乘进最终 alpha | 宿主常用半透明色做「淡一档」的文字，忽略 alpha 会比 DOM 文字更深 | 液态版因此关掉了混合（v10，见第七节）：开着混合时 alpha 会再乘一次，0.6 落到 0.36 |
 
 **考虑过、没采用的替代方案：**
 
@@ -280,7 +284,7 @@ my-blog 现有的回退分支（拿不到 `fontBoundingBoxAscent` 时退回中�
 
 **实现要求：不要复杂编码。** 所有休眠条件汇成**一个判定函数**，任何信号（媒体查询 `change`、尺寸变化、上下文事件）
 到来时都重算一次：判定为「该播」就恢复，判定为「不该播」就休眠。不写状态机，不为每个条件单独写进出逻辑。
-休眠 = 停 raf + 撤掉涂透明；恢复 = 重新走「首张纹理建成才涂透明」。
+休眠 = 停 raf + 撤掉涂透明 + 藏起画布（v10：画布会停在最后一帧，不藏就和真文本叠成重影）；恢复 = 重新走「首张纹理建成才涂透明」。
 
 | 风险 | 说明 |
 | :--- | :--- |
@@ -414,6 +418,9 @@ v5 起按开源流程走：**基建先行，第一版发布之前，my-blog 与�
   公共参数由运行时定义并新增 `debug`；`particle-text` 的 API 与参数表落定；依赖方向由 lint 守
 - **v9（形态不变）**：阶段 0 落地。浏览器测试不再强制串行；依赖方向规则补齐为九条；ogl 产物判据改为不压缩产物里的 region 注释 + 对照测试；
   媒体仿真的基线由 setup 显式设定；node10 解析不到的范围扩大到两个入口
+- **v10（形态不变）**：阶段 1 落地。颜色探针改为每个颜色参数一个隐藏 span；液态版关掉混合；休眠时画布与涂透明一起撤掉（真实 Chrome 里发现重影与被挤掉上下文的白块）；
+  重建放进 raf 回调里紧接着画；`maxDpr` 不是正数按 1；终审后补：画布用 `display` 藏（跟随宿主祖先的 visibility、休眠时不撑出滚动），
+  祖先 `transform: scale` 时按布局尺寸建画布，`text-transform` 画进纹理，首帧交接前确认上下文还在。细节见 [`architecture.md`](architecture.md) 第三、五、六节
 
 ## 十七、待讨论（下一步）
 
