@@ -106,6 +106,7 @@ describe('陷阱确实存在', () => {
       'oklch(0.7 0.15 200)': { computed: 'oklch(0.7 0.15 200)', rgba: [0, 185, 195, 255] },
       'lab(50 40 30)': { computed: 'lab(50 40 30)', rgba: [187, 88, 70, 255] },
       'color-mix(in srgb, red 50%, blue)': { computed: 'color(srgb 0.5 0 0.5)', rgba: [128, 0, 128, 255] },
+      'color(display-p3 1 0 0)': { computed: 'color(display-p3 1 0 0)', rgba: [255, 0, 0, 255] },
     }
     const { targets, cleanup } = modernColors.mount(freshRoot())
     const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!

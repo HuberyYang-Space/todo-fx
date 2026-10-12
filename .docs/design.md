@@ -353,7 +353,7 @@ v5 起按开源流程走：**基建先行，第一版发布之前，my-blog 与�
 | body 的 color 带 0.2s 过渡，切主题只改 html 的 class | 颜色停在上一个主题 |
 | `clamp()` 响应式字号 + 负 `letter-spacing` | 纹理与 DOM 文字对不齐，光标压字 |
 | `overflow: hidden` 的容器（对应 my-blog 的 `::demo`） | 画布四周的流动溢出被裁掉 |
-| oklch / lab / color-mix 颜色 | 第九节的解析坑 |
+| oklch / lab / color-mix / display-p3 颜色 | 第九节的解析坑 |
 | 挂载在隐藏容器里，之后再显示 | 实例永久失效 |
 | 同页多个实例 | WebGL 上下文上限 |
 | 窄容器里文字折行 | 纹理只画一行，被裁掉（应进入休眠） |
