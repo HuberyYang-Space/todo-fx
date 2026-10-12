@@ -4,6 +4,10 @@
     "lib": ["ESNext", "DOM"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "paths": {
+      "@huberyyang/todo-fx": ["./src/index.ts"],
+      "@huberyyang/todo-fx/vue": ["./src/vue/index.ts"]
+    },
     "types": ["node"],
     "allowImportingTsExtensions": true,
     "strict": true,
