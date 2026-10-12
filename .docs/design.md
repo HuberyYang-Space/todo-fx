@@ -211,7 +211,7 @@ Tailwind v4 的默认调色板就是 oklch —— 按开源标准，这是第一
 | :--- | :--- | :--- |
 | 库不认识任何变量名 | `--c-primary` 是调用方传进来的字符串，对宿主零假设 | — |
 | 每帧读而非只读一次 | 主题切换只改 html 的 class，颜色带过渡，读一次会永远停在旧主题 | 有脏样式时每帧强制一次样式重算，与现状同量级（实测约 1μs / 帧） |
-| canvas 回读转 sRGB | 浏览器负责所有色彩空间转换，CSS 以后加新语法也不用跟 | 广色域被裁到 sRGB：实测 `color(display-p3 1 0 0)` 回读成 `255,0,0`（三内核一致），P3 屏上特效文字会比 DOM 文字略灰。上表的计算值与回读值 v9 在 Chromium / Firefox / WebKit 上实测一致（macOS 与 CI 的 Linux 各跑一遍，见 `test/browser/host-fixtures.browser.test.ts` 的 modern-colors 自检） |
+| canvas 回读转 sRGB | 浏览器负责所有色彩空间转换，CSS 以后加新语法也不用跟 | 广色域被裁到 sRGB：实测 `color(display-p3 1 0 0)` 回读成 `255,0,0`（三内核一致，macOS 与 CI 的 Linux 各跑一遍，见 modern-colors 自检），P3 屏上特效文字会比 DOM 文字略灰。上表的计算值与回读值 v9 在 Chromium / Firefox / WebKit 上实测一致（macOS 与 CI 的 Linux 各跑一遍，见 `test/browser/host-fixtures.browser.test.ts` 的 modern-colors 自检） |
 | 颜色自带的 alpha 乘进最终 alpha | 宿主常用半透明色做「淡一档」的文字，忽略 alpha 会比 DOM 文字更深 | — |
 
 **考虑过、没采用的替代方案：**
@@ -318,7 +318,7 @@ my-blog 现有的回退分支（拿不到 `fontBoundingBoxAscent` 时退回中�
 | :--- | :--- | :--- |
 | 集成层并入 Vitest 浏览器模式，不另起 `@playwright/test`（v7） | 只有一个测试框架、一份配置、一个 CI 步骤；夹具测试与 playground 共用同一份宿主陷阱 | 测试跑在 iframe 里：媒体仿真能传进 iframe、三内核都能仿真出 `hover: none`，v9 已证实（[`tech-stack.md`](tech-stack.md) 第十二节）。仿真会跨用例残留、不仿真时的基线又取决于宿主系统（CI 的 Linux WebKit 默认 reduced-motion），由 setup 在每个测试文件与每条用例开始前设回同一基线。原先「各测试文件共享 WebGL 上下文上限、要串行跑」的判断已证伪（每个文件都是新的 iframe 文档，上限只在单个文档内生效） |
 | 壳测试也进真浏览器，不用 happy-dom | happy-dom 没有 WebGL；第六节那类「重渲染抹掉内核写的东西」只有真 DOM 才验得准 | 测试慢于 happy-dom；CI 要装三个浏览器 |
-| CI 里 Chromium 显式开 `--enable-unsafe-swiftshader` | CI 机器没有 GPU。Chrome 从 130 起废弃「自动回退到 SwiftShader 软件渲染」；Playwright 1.63 已默认追加这个开关（v9 实测），显式写上是不把可信度押在上游默认值上。环境可信由三内核的已知结果探针证明，否则内核测试会全部走进门控分支 —— **全绿但什么都没测** | 软件渲染与真 GPU 的像素不完全一致，像素判据只能用「有没有非透明像素」这类宽判据，或只用 k/255 能整除的颜色（0.7 这类值在 SwiftShader 与 GPU 上取整不同）。CI 里 Firefox 跑在 xvfb 提供的 display 下（外部报告说 Linux 上 headless Firefox 建不出 WebGL；CI 实测 xvfb 下 headless 也建得出，见 tech-stack 第六节） |
+| CI 里 Chromium 显式开 `--enable-unsafe-swiftshader` | CI 机器没有 GPU。Chrome 从 130 起废弃「自动回退到 SwiftShader 软件渲染」；Playwright 1.63 已默认追加这个开关（v9 实测），显式写上是不把可信度押在上游默认值上。环境可信由三内核的已知结果探针证明，否则内核测试会全部走进门控分支 —— **全绿但什么都没测** | 软件渲染与真 GPU 的像素不完全一致，像素判据只能用「有没有非透明像素」这类宽判据，或只用 k/255 能整除的颜色（0.7 这类值在 SwiftShader 与 GPU 上取整不同）。CI 里三个内核都是 headless，但整条命令包在 xvfb 里：Linux 上 headless 的 Firefox 没有 display 就建不出 WebGL（CI 对照实测，见 tech-stack 第六节） |
 
 纪律：每个守卫写完故意破坏一次确认变红；变异后先 `cmp` 确认文件真改了再读结果；布局类判据一律挪到真浏览器。
 

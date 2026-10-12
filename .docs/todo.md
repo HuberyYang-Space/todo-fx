@@ -43,11 +43,11 @@ CI 全绿：dev 上 run 35950631877、main 上 run 35951134904）。**下面的�
 
 来源：阶段 0 的独立终审（Minor 级）与执行中留下的待证项。每一项修完都要有证据（守卫类先见一次红），修完勾掉。
 
-- [ ] **`many-instances` 夹具的自检是同义反复**：[`test/browser/host-fixtures.browser.test.ts`](../test/browser/host-fixtures.browser.test.ts) 里那条只断言
+- [x] **`many-instances` 夹具的自检是同义反复**：[`test/browser/host-fixtures.browser.test.ts`](../test/browser/host-fixtures.browser.test.ts) 里那条只断言
   夹具自己的常量 `18 > 16`，从没见过「上下文被挤掉」的现场。改成真的建上下文、数被挤掉的个数，按内核给预期：终审在 macOS 上实测
-  Chromium、WebKit 建 18 个会丢最早的 2 个，**Firefox 一个不丢**（在 Firefox 上这个夹具不构成陷阱，测试里要明说）；Linux（CI）上的个数要在 CI 里实测后再定断言
-- [ ] **design 第九节「display-p3 回读三内核一致」没有测试支撑**：[`design.md`](design.md) 第九节那句只有 macOS 干跑证据。在 modern-colors 自检里加一行
-  `color(display-p3 1 0 0)`（预期回读 `255,0,0`），让 CI 的 Linux 也跑一遍；或者把措辞改成「macOS 实测」
+  Chromium、WebKit 建 18 个会丢最早的 2 个，**Firefox 一个不丢**（在 Firefox 上这个夹具不构成陷阱，测试里要明说）；Linux（CI）上的个数要在 CI 里实测后再定断言（2026-10-12 已修：每个实例建一个 WebGL2 上下文、按内核断言被挤掉的下标；CI run 38187560309 实测 Linux 与 macOS 一致，Chromium、WebKit 丢 `[0,1]`，Firefox 不丢；夹具改成不超上限时两个内核都红）
+- [x] **design 第九节「display-p3 回读三内核一致」没有测试支撑**：[`design.md`](design.md) 第九节那句只有 macOS 干跑证据。在 modern-colors 自检里加一行
+  `color(display-p3 1 0 0)`（预期回读 `255,0,0`），让 CI 的 Linux 也跑一遍；或者把措辞改成「macOS 实测」（2026-10-12 已加进夹具，CI run 38187560309 的 Linux 三内核同样读回 `255,0,0`，design 措辞补上了出处）
 - [x] **`release.yml` 的 checkout 把可写 token 留给了所有步骤**：[`.github/workflows/release.yml`](../.github/workflows/release.yml) 的 `actions/checkout`
   默认把 `contents: write` 的 token 写进 `.git/config`，之后的 `pnpm install` 与跑第三方代码的测试都读得到。加 `persist-credentials: false`
   （changelogithub 走环境变量里的 token 调 API，不需要 git 凭据）。2026-10-12 已修（changelogithub 15.0.5 的 git 子命令只有本地读操作）；运行时证据要等第一次发版
@@ -56,9 +56,9 @@ CI 全绿：dev 上 run 35950631877、main 上 run 35951134904）。**下面的�
 - [x] **lint 守卫放行了一条构建不通的路**：[`test/unit/eslint-guards.test.ts`](../test/unit/eslint-guards.test.ts) 放行 `src/vue/` 里
   `import '@huberyyang/todo-fx'`，但终审实测 tsdown 构建这种写法报 `UNRESOLVED_IMPORT`。把 vue 项的包名自引用改为拦截（提示指向 `'../index'`），
   放行用例改成拦截用例，并照例变异验证（2026-10-12 已修：先复现构建失败，新用例先红后绿，删规则变异后恰好这 2 条红）
-- [ ] **CI 里 Firefox 用 headed 是否必需**：CI 实测 headless 的 firefox-touch 在 xvfb 下也建得出 WebGL（run 35950071354），默认 Firefox instance 的
+- [x] **CI 里 Firefox 用 headed 是否必需**：CI 实测 headless 的 firefox-touch 在 xvfb 下也建得出 WebGL（run 35950071354），默认 Firefox instance 的
   `headless: !process.env.CI` 可能不必要。在 CI 上去掉它（Firefox 全部 headless、仍在 `xvfb-run` 下）看探针；再试一次不套 `xvfb-run`，
-  确定到底是 headed 还是 display 在起作用，据此简化配置并改正 [`tech-stack.md`](tech-stack.md) 第六、九节与 [`vitest.config.ts`](../vitest.config.ts) 的注释
+  确定到底是 headed 还是 display 在起作用，据此简化配置并改正 [`tech-stack.md`](tech-stack.md) 第六、九节与 [`vitest.config.ts`](../vitest.config.ts) 的注释（2026-10-12 已定：headed 不需要、display 需要。全部 headless + xvfb 全绿（run 38187560309），去掉 xvfb 只有 Firefox 的 WebGL 建不出（run 38187560274）；已删 `firefoxHeadless`，保留 `xvfb-run`）
 - [x] **tech-stack 第一节「tsdown 生成 d.ts 依赖 TS 编译器 API」待核实**：调研时读 rolldown-plugin-dts 0.28.6 源码发现它在 TS 7 下会改用 tsgo，
   tsdown 0.23.0 的 typescript peer 也包含 `^7.0.0`，这条锁 TS 6 的理由对 tsdown 可能不成立（vue-tsc 与 typescript-eslint 两条理由不受影响）。
   只读过源码、没实跑，核实后改正那一行（2026-10-12 实跑：TS 7.0.2 下走 tsgo，d.ts 与 TS 6 逐字节一致，这条理由对 tsdown 不成立，已改正；锁 6 的结论不变）
