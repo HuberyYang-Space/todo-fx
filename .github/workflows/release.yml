@@ -29,7 +29,7 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref_name }}
           # changelogithub 要完整历史才能找到上一个 tag，浅克隆会生成空的 changelog
           fetch-depth: 0
-          # 默认会把 contents: write 的 token 写进 .git/config，之后的 pnpm install 与测试里的第三方代码都读得到。
+          # 默认会把 contents: write 的 token 持久化进 git 配置（v6 起是 $RUNNER_TEMP 下被 include 的单独文件），之后的 pnpm install 与测试里的第三方代码都读得到。
           # changelogithub 只在本地读 git、调 API 用的是环境变量里的 GITHUB_TOKEN，不需要 git 凭据
           persist-credentials: false
       - uses: pnpm/action-setup@v6

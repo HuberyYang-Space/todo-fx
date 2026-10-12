@@ -13,7 +13,7 @@
 
 | 事实 | 怎么核实的 | 结论 |
 | :--- | :--- | :--- |
-| TypeScript `latest` 是 7.0.2，但它**没有编译器 API** | 装 ts7 与 ts6 对照：ts7 的 `require('typescript')` 只导出 `version`、`versionMajorMinor`，`createProgram` 为 `undefined`；ts6.0.3 为 `function` | vue-tsc（Volar）、typescript-eslint（peer `>=4.8.4 <6.1.0`）都依赖这套 API → 锁 6。tsdown 0.23.0 不受影响：装了 TS 7.0 时 rolldown-plugin-dts 0.28.6 自动改用 tsgo 生成 d.ts（2026-10-12 在隔离目录实测 7.0.2，两个入口的 d.ts 与 TS 6.0.3 走 tsc 的产物逐字节一致）；但它按版本前缀 `"7.0"` 判断，TS 7.1 会退回编译器 API 路径而失败，将来迁移时先看它是否跟进 |
+| TypeScript `latest` 是 7.0.2，但它**没有编译器 API** | 装 ts7 与 ts6 对照：ts7 的 `require('typescript')` 只导出 `version`、`versionMajorMinor`，`createProgram` 为 `undefined`；ts6.0.3 为 `function` | vue-tsc（Volar）、typescript-eslint（peer `>=4.8.4 <6.1.0`）都依赖这套 API → 锁 6。tsdown 0.23.0 在 `src` 里没有 `.vue`、dts 没开 `vue` 选项时不受影响（改用 SFC 写壳就重新依赖编译器 API，TS 7.0 下直接报错）：装了 TS 7.0 时 rolldown-plugin-dts 0.28.6 自动改用 tsgo 生成 d.ts（2026-10-12 在隔离目录实测 7.0.2，两个入口的 d.ts 与 TS 6.0.3 走 tsc 的产物逐字节一致）；但它按版本前缀 `"7.0"` 判断，TS 7.1 会退回编译器 API 路径而失败，将来迁移时先看它是否跟进 |
 | pnpm 12 仍有 1 天的默认发布冷却期 | 同一范围 `@cloudflare/workers-types@^5.20260901.0`：pnpm 11.27.1 与 12.5.1 在默认配置下都跳过 6 小时前发布的 `5.20260923.1`、装了 30 小时前的 `5.20260922.1`；显式写 `minimumReleaseAge: 1440` 结果相同 | 与 11 一致。另外：默认配置下，**精确版本号**即使不足 1 天也会被装上（宽松回退），显式配置后才严格拦截 |
 | pnpm 12 对 workspace 里的未知键直接报错 | 锁定 `pnpm@12.5.1` 的项目里写一个拼错的 `minimumReleaseAg`，install 报错退出 | 拼错的配置不会再悄悄失效。**但 `ignoredBuiltDependencies` 被接受却完全不起作用**（写了 esbuild 照样 `ERR_PNPM_IGNORED_BUILDS`；v11 起由 `allowBuilds` 取代），不要照抄 todo-scripts 的这一键。本项目依赖树里没有带构建脚本的包，workspace 不写任何构建相关的键 |
 | attw 的 `esm-only` 档会忽略 node10 解析 | attw 源码 `profiles.ts`：`"esm-only": { ignoreResolutions: ["node10", "node16-cjs"] }` | attw 不再检查 node10，改由 README 写明。实测更严重：纯 ESM 下 tsdown 不写 `main` / `types`，node10 连根入口 `.` 都解析不到，不只是 `./vue` |
@@ -89,7 +89,7 @@
 | :--- | :--- | :--- | :--- |
 | 提交钩子 | `todo-scripts commitlint-init` 生成（用 `pnpm dlx --package=@huberyyang/todo-scripts@1.4.2 hubery commitlint-init --linter eslint`，不把 todo-scripts 留在依赖里）：`husky 9.1.7` + `lint-staged 17.5.1`（`"*": "eslint --fix --no-error-on-unmatched-pattern"`，不带 `.`）+ `@commitlint/cli`、`@commitlint/config-conventional 21.2.3`；pre-commit 只跑 `eslint --fix` | Hubery 的标准 | 类型错误与测试失败要到 CI 才暴露（`todo-scripts` HB-38 的已知取舍）。config-conventional 限制正文每行 100 字符，中文正文要折行 |
 | 发版 | 本地 `pnpm release` = 全量门禁 → `bumpp 12.3.0 --no-verify` → `npm publish`；脚本里的 `nr` 由 `@antfu/ni 30.6.0` 提供 | 沿用 todo-scripts | `npm publish` 在本地跑，包**不带 provenance**（沿用 `todo-scripts` HB-30 的取舍）。发版路径从第一版起固定：以后若改走 CI 带 provenance 发布，就不能再切回本地，否则 my-blog 的 `trustPolicy: no-downgrade` 会拒装 |
-| Release | `release.yml` 由 tag 触发：校验 tag 与版本号、重跑门禁、`pnpm dlx changelogithub@15` 生成 GitHub Release（锁大版本）；checkout 设 `persist-credentials: false`：可写 token 不留在 `.git/config` 里给 `pnpm install` 与测试读到 | 沿用 todo-scripts | — |
+| Release | `release.yml` 由 tag 触发：校验 tag 与版本号、重跑门禁、`pnpm dlx changelogithub@15` 生成 GitHub Release（锁大版本）；checkout 设 `persist-credentials: false`：可写 token 不持久化进 git 配置（checkout v6 起存在 `$RUNNER_TEMP` 下被 include 的单独文件里），`pnpm install` 与测试里的第三方代码读不到 | 沿用 todo-scripts | — |
 | Release notes 语言 | 提交用中文（`/commit` 规定）；`changelogithub.config.ts` 把分类标题配成中文（`🚀 新功能` / `🐞 问题修复` 等）。已实测 `changelogithub@15.0.5` dry-run：中文提交与中文标题正常生成 Release 正文 | 与提交语言一致 | 两句写死在源码里的英文改不了：结尾的 `View changes on GitHub`，以及没有可收录提交时的 `No significant changes`；作者署名前的 `by` 也是英文 |
 | 依赖升级 | `npx taze major` 手动跑，不装进 devDeps | 沿用 todo-scripts | 会提示升级到 TS 7，要跳过（第三节） |
 | 分支 | dev 开发 → PR → main，merge commit | — | — |

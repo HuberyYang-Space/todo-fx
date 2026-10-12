@@ -131,7 +131,7 @@ export default antfu(
       'no-restricted-imports': ['error', {
         patterns: [
           { regex: '^\\.\\.(?!/index$)(?:/|$)', message: '壳只能经由公开入口 \'../index\' 调用内核。' },
-          { regex: '^@huberyyang/todo-fx(?:/|$)', message: '壳不得经由包名引用内核：tsdown 构建时解析不到自己的包名（UNRESOLVED_IMPORT），改用 \'../index\'。' },
+          { ...noSelfReference, message: '壳不得经由包名引用内核：tsdown 构建时解析不到自己的包名（UNRESOLVED_IMPORT），改用 \'../index\'。' },
         ],
       }],
     },

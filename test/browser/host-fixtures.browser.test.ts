@@ -146,6 +146,9 @@ describe('陷阱确实存在', () => {
     const lost = contexts.flatMap((gl, i) => gl.isContextLost() ? [i] : [])
     await annotate(`${server.platform}/${server.browser}：${targets.length} 个上下文里被挤掉的是 ${JSON.stringify(lost)}`)
     expect(lost).toEqual(evicted[server.browser])
+    // 与内核 destroy 的约定一致：不把 16 个活着的上下文留给同一文档里后面的用例
+    for (const gl of contexts)
+      gl.getExtension('WEBGL_lose_context')?.loseContext()
     cleanup()
   })
 

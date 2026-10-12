@@ -61,7 +61,7 @@
   - 能跑：问题只在本会话的启动环境。本地门禁里 Firefox 那部分请 Hubery 在外部终端跑，或者整体以 CI 为准。
   - 也跑不了：整机问题，另行排查。本计划照常执行，Firefox 的结论一律以 CI 为准，并记进「执行偏离」。
   - 下文的「本地门禁」写作 `LOCAL_BROWSER`：Firefox 能跑时是 `--project browser`；不能跑时是
-    `--project 'browser (chromium)' --project 'browser (webkit)' --project 'browser (chromium-touch)' --project 'browser (webkit-touch)'`。
+    `--project 'browser (chromium)' --project 'browser (webkit)' --project chromium-touch --project webkit-touch`（touch instance 的 project 名不带 `browser` 前缀，写错会被 vitest 静默跳过）。
 - **账本**：`.superpowers/sdd/2026-09-24-phase-0-leftovers/progress.md`（`sdd-workspace` 脚本给出的目录，已被 git 忽略）。
   每个 `Ruling:` 都记在那里，最后汇总进本文件的「执行偏离」。
 - **`task-start` 脚本认的是英文的 `### Task N` 标题**，本计划用中文「任务 N」，阶段 0 已踩过：按标题的行号直接读对应任务，不跑这个脚本（沿用阶段 0 的 Ruling）。

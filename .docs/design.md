@@ -211,7 +211,7 @@ Tailwind v4 的默认调色板就是 oklch —— 按开源标准，这是第一
 | :--- | :--- | :--- |
 | 库不认识任何变量名 | `--c-primary` 是调用方传进来的字符串，对宿主零假设 | — |
 | 每帧读而非只读一次 | 主题切换只改 html 的 class，颜色带过渡，读一次会永远停在旧主题 | 有脏样式时每帧强制一次样式重算，与现状同量级（实测约 1μs / 帧） |
-| canvas 回读转 sRGB | 浏览器负责所有色彩空间转换，CSS 以后加新语法也不用跟 | 广色域被裁到 sRGB：实测 `color(display-p3 1 0 0)` 回读成 `255,0,0`（三内核一致，macOS 与 CI 的 Linux 各跑一遍，见 modern-colors 自检），P3 屏上特效文字会比 DOM 文字略灰。上表的计算值与回读值 v9 在 Chromium / Firefox / WebKit 上实测一致（macOS 与 CI 的 Linux 各跑一遍，见 `test/browser/host-fixtures.browser.test.ts` 的 modern-colors 自检） |
+| canvas 回读转 sRGB | 浏览器负责所有色彩空间转换，CSS 以后加新语法也不用跟 | 广色域被裁到 sRGB：实测 `color(display-p3 1 0 0)` 回读成 `255,0,0`（三内核一致：CI 的 Linux 三内核与 macOS 的 Chromium、WebKit 由 modern-colors 自检覆盖，macOS 的 Firefox 只有阶段 0 的干跑证据），P3 屏上特效文字会比 DOM 文字略灰。上表的计算值与回读值 v9 在 Chromium / Firefox / WebKit 上实测一致（macOS 与 CI 的 Linux 各跑一遍，见 `test/browser/host-fixtures.browser.test.ts` 的 modern-colors 自检） |
 | 颜色自带的 alpha 乘进最终 alpha | 宿主常用半透明色做「淡一档」的文字，忽略 alpha 会比 DOM 文字更深 | — |
 
 **考虑过、没采用的替代方案：**
