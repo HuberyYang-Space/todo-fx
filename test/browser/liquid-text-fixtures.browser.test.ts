@@ -63,4 +63,24 @@ describe('宿主场景夹具', () => {
     const shown = targets.map(({ layerEl }) => getComputedStyle(layerEl.querySelector('canvas')!).display !== 'none')
     expect(shown).toEqual(expected.map(c => c === 'transparent'))
   })
+
+  it('many-instances：被挤掉的实例一次都没有涂透明过（哪怕 lost 事件晚到一帧）', async () => {
+    const root = document.createElement('div')
+    document.body.append(root)
+    const { targets, cleanup } = manyInstances.mount(root)
+    const everTransparent = new Set<number>()
+    const observer = new MutationObserver(() => {
+      targets.forEach(({ textEl }, i) => {
+        if (textEl.style.color === 'transparent')
+          everTransparent.add(i)
+      })
+    })
+    observer.observe(root, { attributes: true, attributeFilter: ['style'], subtree: true })
+    const instances = targets.map(({ textEl, layerEl }) => createLiquidText(textEl, layerEl))
+    cleanups.push(() => root.remove(), cleanup, () => observer.disconnect(), () => instances.forEach(i => i?.destroy()))
+    await nextFrames(10)
+    // WebKit 首帧时 isContextLost() 已经为 true，lost 事件却要到下一帧才派发
+    for (const i of evicted[server.browser]!)
+      expect(everTransparent.has(i), `第 ${i} 个实例涂过透明`).toBe(false)
+  })
 })

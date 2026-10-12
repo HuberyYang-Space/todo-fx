@@ -16,6 +16,11 @@ export function watchContext(canvas: HTMLCanvasElement, onLost: () => void, onRe
   }
 }
 
+/** 画布上的 WebGL 上下文此刻是否已丢失；2D 画布拿不到 WebGL 上下文，恒为 false */
+export function isContextLost(canvas: HTMLCanvasElement): boolean {
+  return (canvas.getContext('webgl2') ?? canvas.getContext('webgl'))?.isContextLost() ?? false
+}
+
 /**
  * 主动交还 WebGL 上下文：不等垃圾回收，不再占着同页约 16 个的上下文名额。
  * 同一画布上 getContext 只返回已有的那个上下文；2D 画布在这里拿到 null，天然跳过

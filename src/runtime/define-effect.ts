@@ -7,7 +7,7 @@ import { applyPatch, optionTypesOf, resolveParams } from '../compute/params'
 import { createColorProbe } from './color-probe'
 import { commonParams } from './common-params'
 import { missingApi, sleepReason, watchMedia } from './gate'
-import { releaseContext, watchContext } from './gl-lifecycle'
+import { isContextLost, releaseContext, watchContext } from './gl-lifecycle'
 import { createCanvas, placeCanvas } from './layer'
 import { createLoop } from './loop'
 import { createPointer } from './pointer'
@@ -179,6 +179,13 @@ export function defineEffect<T extends ParamTable>(definition: EffectDefinition<
     }
 
     function tick(dt: number): void {
+      // 交接前先确认上下文还在：WebKit 里被挤掉的上下文 isContextLost() 先变 true、lost 事件下一帧才到，
+      // 不查的话会先涂透明，画布却画不出东西，标题隐身一帧
+      if (!painted && isContextLost(canvas)) {
+        contextLost = true
+        evaluate()
+        return
+      }
       if (pendingBuild && !build())
         return
       time += dt
