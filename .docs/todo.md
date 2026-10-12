@@ -48,9 +48,9 @@ CI 全绿：dev 上 run 35950631877、main 上 run 35951134904）。**下面的�
   Chromium、WebKit 建 18 个会丢最早的 2 个，**Firefox 一个不丢**（在 Firefox 上这个夹具不构成陷阱，测试里要明说）；Linux（CI）上的个数要在 CI 里实测后再定断言
 - [ ] **design 第九节「display-p3 回读三内核一致」没有测试支撑**：[`design.md`](design.md) 第九节那句只有 macOS 干跑证据。在 modern-colors 自检里加一行
   `color(display-p3 1 0 0)`（预期回读 `255,0,0`），让 CI 的 Linux 也跑一遍；或者把措辞改成「macOS 实测」
-- [ ] **`release.yml` 的 checkout 把可写 token 留给了所有步骤**：[`.github/workflows/release.yml`](../.github/workflows/release.yml) 的 `actions/checkout`
+- [x] **`release.yml` 的 checkout 把可写 token 留给了所有步骤**：[`.github/workflows/release.yml`](../.github/workflows/release.yml) 的 `actions/checkout`
   默认把 `contents: write` 的 token 写进 `.git/config`，之后的 `pnpm install` 与跑第三方代码的测试都读得到。加 `persist-credentials: false`
-  （changelogithub 走环境变量里的 token 调 API，不需要 git 凭据）
+  （changelogithub 走环境变量里的 token 调 API，不需要 git 凭据）。2026-10-12 已修（changelogithub 15.0.5 的 git 子命令只有本地读操作）；运行时证据要等第一次发版
 - [ ] **两个零消费方的脚本**：[`package.json`](../package.json) 的 `dev`（`tsdown --watch`，playground 的 alias 指向 `src`，没有东西读 watch 产物）与
   `commitlint`（钩子直接 `pnpm exec commitlint`，不经过它）。按「零消费方一律删除」删掉，README 命令表与 CLAUDE.md 若提到要同步
 - [ ] **lint 守卫放行了一条构建不通的路**：[`test/unit/eslint-guards.test.ts`](../test/unit/eslint-guards.test.ts) 放行 `src/vue/` 里

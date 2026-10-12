@@ -89,7 +89,7 @@
 | :--- | :--- | :--- | :--- |
 | 提交钩子 | `todo-scripts commitlint-init` 生成（用 `pnpm dlx --package=@huberyyang/todo-scripts@1.4.2 hubery commitlint-init --linter eslint`，不把 todo-scripts 留在依赖里）：`husky 9.1.7` + `lint-staged 17.5.1`（`"*": "eslint --fix --no-error-on-unmatched-pattern"`，不带 `.`）+ `@commitlint/cli`、`@commitlint/config-conventional 21.2.3`；pre-commit 只跑 `eslint --fix` | Hubery 的标准 | 类型错误与测试失败要到 CI 才暴露（`todo-scripts` HB-38 的已知取舍）。config-conventional 限制正文每行 100 字符，中文正文要折行 |
 | 发版 | 本地 `pnpm release` = 全量门禁 → `bumpp 12.3.0 --no-verify` → `npm publish`；脚本里的 `nr` 由 `@antfu/ni 30.6.0` 提供 | 沿用 todo-scripts | `npm publish` 在本地跑，包**不带 provenance**（沿用 `todo-scripts` HB-30 的取舍）。发版路径从第一版起固定：以后若改走 CI 带 provenance 发布，就不能再切回本地，否则 my-blog 的 `trustPolicy: no-downgrade` 会拒装 |
-| Release | `release.yml` 由 tag 触发：校验 tag 与版本号、重跑门禁、`pnpm dlx changelogithub@15` 生成 GitHub Release（锁大版本） | 沿用 todo-scripts | — |
+| Release | `release.yml` 由 tag 触发：校验 tag 与版本号、重跑门禁、`pnpm dlx changelogithub@15` 生成 GitHub Release（锁大版本）；checkout 设 `persist-credentials: false`：可写 token 不留在 `.git/config` 里给 `pnpm install` 与测试读到 | 沿用 todo-scripts | — |
 | Release notes 语言 | 提交用中文（`/commit` 规定）；`changelogithub.config.ts` 把分类标题配成中文（`🚀 新功能` / `🐞 问题修复` 等）。已实测 `changelogithub@15.0.5` dry-run：中文提交与中文标题正常生成 Release 正文 | 与提交语言一致 | 两句写死在源码里的英文改不了：结尾的 `View changes on GitHub`，以及没有可收录提交时的 `No significant changes`；作者署名前的 `by` 也是英文 |
 | 依赖升级 | `npx taze major` 手动跑，不装进 devDeps | 沿用 todo-scripts | 会提示升级到 TS 7，要跳过（第三节） |
 | 分支 | dev 开发 → PR → main，merge commit | — | — |
