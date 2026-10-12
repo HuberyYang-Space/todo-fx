@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { server } from 'vitest/browser'
 import { clampFont } from '../../playground/fixtures/clamp-font'
 import { hiddenContainer } from '../../playground/fixtures/hidden-container'
 import { hostFixtures } from '../../playground/fixtures/index'
@@ -50,6 +51,10 @@ describe.each(hostFixtures.map(f => [f.id, f] as const))('%s：结构与清理',
     expect(document.documentElement.className).toBe(htmlClass)
   })
 })
+
+// 同一文档里超过上限时，最早建的上下文当场被挤掉（isContextLost() 立即为 true）。
+// Firefox 的上限高得多（tech-stack 第六节：40 个也不丢），在它上面这个夹具不构成陷阱
+const evicted: Record<string, number[]> = { chromium: [0, 1], firefox: [], webkit: [0, 1] }
 
 describe('陷阱确实存在', () => {
   it('reset 把画布压到标题宽度，inline max-width: none 能解开', () => {
@@ -130,10 +135,16 @@ describe('陷阱确实存在', () => {
     cleanup()
   })
 
-  it('实例数超过同文档 WebGL 上下文上限（16）', () => {
+  it('每个实例一个 WebGL 上下文时，最早建的被挤掉', async ({ annotate }) => {
     const { targets, cleanup } = manyInstances.mount(freshRoot())
-    expect(targets.length).toBeGreaterThan(16)
-    expect(new Set(targets.map(t => t.layerEl)).size).toBe(targets.length)
+    const contexts = targets.map(({ layerEl }) => {
+      const canvas = document.createElement('canvas')
+      layerEl.append(canvas)
+      return canvas.getContext('webgl2')!
+    })
+    const lost = contexts.flatMap((gl, i) => gl.isContextLost() ? [i] : [])
+    await annotate(`${server.platform}/${server.browser}：${targets.length} 个上下文里被挤掉的是 ${JSON.stringify(lost)}`)
+    expect(lost).toEqual(evicted[server.browser])
     cleanup()
   })
 

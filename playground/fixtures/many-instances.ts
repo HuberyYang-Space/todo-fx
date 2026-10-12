@@ -1,7 +1,7 @@
 import type { HostFixture } from './types'
 import { createHeading, createHost } from './dom'
 
-// Chromium 与 WebKit 同一文档里第 17 个 WebGL 上下文会挤掉最旧的一个（实测），所以要比 16 多
+// Chromium 与 WebKit 同一文档里第 17 个 WebGL 上下文会挤掉最旧的一个（实测），所以要比 16 多；Firefox 上限高得多，这里不会触发
 const COUNT = 18
 
 export const manyInstances: HostFixture<never> = {
