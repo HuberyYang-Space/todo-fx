@@ -39,8 +39,11 @@ export function createPointer(canvas: HTMLCanvasElement, enterRadius: () => numb
 
   function onMouseMove(event: MouseEvent): void {
     const rect = canvas.getBoundingClientRect()
-    const nextX = event.clientX - rect.left
-    const nextY = event.clientY - rect.top
+    // 换算成画布自己的 CSS 像素：祖先带 transform: scale 时屏幕上的距离被缩放过
+    const scaleX = rect.width ? Number.parseFloat(canvas.style.width) / rect.width : 1
+    const scaleY = rect.height ? Number.parseFloat(canvas.style.height) / rect.height : 1
+    const nextX = (event.clientX - rect.left) * scaleX
+    const nextY = (event.clientY - rect.top) * scaleY
     const now = performance.now()
     if (lastTime) {
       const gap = Math.max(now - lastTime, MIN_EVENT_GAP)

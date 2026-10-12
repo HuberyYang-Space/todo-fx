@@ -122,7 +122,8 @@ describe('开播', () => {
   })
 
   it('画布按文字外框加四周 padding 定尺寸与位置，解除 max-width、不挡指针、对读屏隐藏', async () => {
-    target.heading.style.border = '5px solid'
+    // 小数宽度：offsetWidth 是取整后的值，拿它和 getBoundingClientRect 比缩放时不能把取整误差当成缩放
+    target.heading.style.cssText += 'border: 5px solid; width: 300.4px;'
     const { log } = start({ padding: 20 })
     await expect.poll(painted).toBe('transparent')
     const canvas = target.layerEl.querySelector('canvas')!
@@ -133,6 +134,7 @@ describe('开播', () => {
     expect(Math.abs(rect.top - (text.top - 20))).toBeLessThanOrEqual(1)
     expect(Math.abs(rect.width - (text.width + 40))).toBeLessThanOrEqual(1)
     expect(Math.abs(rect.height - (text.height + 40))).toBeLessThanOrEqual(1)
+    expect(Number.parseFloat(canvas.style.width)).toBeCloseTo(text.width + 40, 3)
     const raster = log.rasters.at(-1)!
     expect(canvas.width).toBe(raster.width)
     expect(raster.width).toBe(Math.round((text.width + 40) * raster.dpr))
@@ -150,6 +152,33 @@ describe('开播', () => {
     target.heading.style.visibility = 'hidden'
     expect(getComputedStyle(target.textEl).visibility).toBe('hidden')
     expect(shown()).toBe(false)
+  })
+
+  it('祖先带 transform: scale（zoom-in 入场动画中途开播）时画布按布局尺寸建，变换撤掉后仍对齐', async () => {
+    const box = document.createElement('div')
+    box.style.cssText = 'transform: scale(0.5); transform-origin: 0 0;'
+    target.heading.before(box)
+    box.append(target.heading)
+    cleanups.push(() => box.remove())
+    // 文字不在根元素左上角，偏移量也要换算
+    target.heading.style.paddingLeft = '40px'
+    const { log } = start({ padding: 20 })
+    await expect.poll(painted).toBe('transparent')
+    const canvas = target.layerEl.querySelector('canvas')!
+    const near = (a: number, b: number): boolean => Math.abs(a - b) <= 1
+    const aligned = (scale: number): boolean => {
+      const text = target.textEl.getBoundingClientRect()
+      const rect = canvas.getBoundingClientRect()
+      return near(rect.left, text.left - 20 * scale) && near(rect.top, text.top - 20 * scale)
+        && near(rect.width, text.width + 40 * scale) && near(rect.height, text.height + 40 * scale)
+    }
+    expect(aligned(0.5)).toBe(true)
+    // 画布在同一个变换里，跟着缩放；ResizeObserver 不响应 transform，撤掉变换时不会有重建来纠正
+    const builds = log.calls.filter(c => c === 'build').length
+    box.style.transform = 'none'
+    await nextFrames(3)
+    expect(log.calls.filter(c => c === 'build')).toHaveLength(builds)
+    expect(aligned(1)).toBe(true)
   })
 
   it('宿主 reset 的 canvas { max-width: 100% } 压不扁画布', async () => {
@@ -502,6 +531,23 @@ describe('指针', () => {
     expect(movedFrames).toHaveLength(1)
     expect(movedFrames[0]!.pointer.x).toBeCloseTo(30, 0)
     expect(movedFrames[0]!.pointer.y).toBeCloseTo(20, 0)
+  })
+
+  it('祖先带 transform: scale 时，指针坐标换算成画布自己的 CSS 像素', async () => {
+    const box = document.createElement('div')
+    box.style.cssText = 'transform: scale(0.5); transform-origin: 0 0;'
+    target.heading.before(box)
+    box.append(target.heading)
+    cleanups.push(() => box.remove())
+    const { log } = start()
+    await expect.poll(painted).toBe('transparent')
+    const rect = target.layerEl.querySelector('canvas')!.getBoundingClientRect()
+    window.dispatchEvent(new MouseEvent('mousemove', { clientX: rect.left + 15, clientY: rect.top + 10 }))
+    await expect.poll(() => log.frames.filter(f => f.pointer.moved)).toHaveLength(1)
+    const { pointer } = log.frames.find(f => f.pointer.moved)!
+    // 不换算是 15、10；画布在缩放后的屏幕上按像素对齐，换算回来会放大成约 1px 的误差
+    expect(Math.abs(pointer.x - 30)).toBeLessThanOrEqual(1.5)
+    expect(Math.abs(pointer.y - 20)).toBeLessThanOrEqual(1.5)
   })
 
   it('离开 enterRadius 之外 hover 回落到 0', async () => {
