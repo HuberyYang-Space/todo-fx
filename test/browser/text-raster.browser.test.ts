@@ -23,6 +23,10 @@ function raster(): ReturnType<typeof rasterizeText> {
   return rasterizeText(target.textEl, size, PADDING, dpr)
 }
 
+function pixels({ image, width, height }: ReturnType<typeof rasterizeText>): string {
+  return image.getContext('2d')!.getImageData(0, 0, width, height).data.join()
+}
+
 /** 墨迹的外框（alpha 过半的像素），物理像素 */
 function inkBox({ image, width, height }: ReturnType<typeof rasterizeText>): { left: number, right: number, bottom: number } {
   const data = image.getContext('2d')!.getImageData(0, 0, width, height).data
@@ -63,5 +67,25 @@ describe('text-raster 与 DOM 文字对齐', () => {
     const tight = inkBox(result)
     // 6 个字符之间有 5 个间隔，每个收紧 4px
     expect((loose.right - loose.left) - (tight.right - tight.left)).toBeCloseTo(5 * 4 * result.dpr, -0.5)
+  })
+
+  it.for([
+    ['uppercase', 'hubery yang', 'HUBERY YANG'],
+    ['lowercase', 'HUBERY YANG', 'hubery yang'],
+    // 连字符后要大写；撇号、数字、下划线后不大写（Chromium 与 WebKit 实测一致）
+    ['capitalize', 'hubery yang-space don\'t a1b c_d', 'Hubery Yang-Space Don\'t A1b C_d'],
+  ] as const)('text-transform: %s 也画进纹理（canvas 不认这条 CSS）', ([transform, source, shown]) => {
+    target = mountHeading(shown, 'font: 700 64px sans-serif; margin: 0; white-space: nowrap;')
+    const expected = pixels(raster())
+    target.cleanup()
+    target = mountHeading(source, `font: 700 64px sans-serif; margin: 0; white-space: nowrap; text-transform: ${transform};`)
+    // 逐像素比：墨迹外框只看两头，中间某个字母大小写不对也一样
+    expect(pixels(raster())).toEqual(expected)
+  })
+
+  it('lang 不是合法的语言标签时照样画（toLocaleUpperCase 会抛 RangeError，抛出去就熔断了）', () => {
+    target = mountHeading('hubery', 'font: 700 64px sans-serif; margin: 0; text-transform: uppercase;')
+    target.heading.lang = '!!'
+    expect(inkBox(raster()).right).toBeGreaterThan(0)
   })
 })
