@@ -129,11 +129,14 @@ export function defineEffect<T extends ParamTable>(definition: EffectDefinition<
     const pointer = createPointer(canvas, () => common.enterRadius)
     const loop = createLoop(tick)
 
+    // 画布与涂透明同进同退：休眠时只撤涂透明的话，WebGL 画布停在最后一帧、和真文本叠成重影；
+    // 被挤掉上下文的画布在 Chromium 里还会画成不透明的白块，把真文本整个盖住（真实 Chrome 里实测）
     function paint(): void {
       if (painted)
         return
       colorBeforePaint = textEl.style.color
       textEl.style.color = 'transparent'
+      canvas.style.visibility = 'visible'
       painted = true
     }
 
@@ -141,6 +144,7 @@ export function defineEffect<T extends ParamTable>(definition: EffectDefinition<
       if (!painted)
         return
       textEl.style.color = colorBeforePaint
+      canvas.style.visibility = 'hidden'
       painted = false
     }
 

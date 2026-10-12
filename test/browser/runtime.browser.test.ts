@@ -33,6 +33,14 @@ function start(options = {}) {
 
 const painted = (): string => target.textEl.style.color
 
+/**
+ * 画布此刻露没露出来。休眠时只撤涂透明不够：WebGL 画布停在最后一帧，和真文本叠成重影；
+ * 被挤掉上下文的画布在 Chromium 里还会画成不透明的白块，把真文本整个盖住（真实 Chrome 里 A/B 证实）
+ */
+function shown(layerEl = target.layerEl): boolean {
+  return getComputedStyle(layerEl.querySelector('canvas')!).visibility === 'visible'
+}
+
 async function expectFrozen(frames: unknown[]): Promise<void> {
   const count = frames.length
   await nextFrames(3)
@@ -90,8 +98,10 @@ describe('开播', () => {
     const { log } = start()
     await expect.poll(painted).toBe('transparent')
     expect(log.calls.slice(0, 3)).toEqual(['setup', 'build', 'frame'])
-    // build 与首帧时文字都还没涂透明
+    // build 与首帧时文字都还没涂透明，画布也还没露出来；首帧画完两边同时交接
     expect(log.colorAtHook.slice(0, 2)).toEqual(['', ''])
+    expect(log.canvasAtHook.slice(0, 2)).toEqual(['hidden', 'hidden'])
+    expect(shown()).toBe(true)
   })
 
   it('dt 夹取在 [0, 1/30] 秒，time 是 dt 的累计', async () => {
@@ -152,10 +162,12 @@ describe('休眠条件逐个进出', () => {
 
     await commands.emulateMedia(enter)
     await expect.poll(painted).toBe('')
+    expect(shown()).toBe(false)
     await expectFrozen(log.frames)
 
     await commands.emulateMedia(exit)
     await expect.poll(painted).toBe('transparent')
+    expect(shown()).toBe(true)
     const count = log.frames.length
     await nextFrames(2)
     expect(log.frames.length).toBeGreaterThan(count)
@@ -167,6 +179,7 @@ describe('休眠条件逐个进出', () => {
     await nextFrames(3)
     expect(log.calls).toEqual(['setup'])
     expect(painted()).toBe('')
+    expect(shown()).toBe(false)
 
     await commands.emulateMedia({ reducedMotion: 'no-preference' })
     await expect.poll(painted).toBe('transparent')
@@ -191,6 +204,7 @@ describe('休眠条件逐个进出', () => {
 
     actions.隐藏()
     await expect.poll(() => textEl.style.color).toBe('')
+    expect(shown(layerEl)).toBe(false)
     await expectFrozen(fake.log.frames)
   })
 
@@ -211,6 +225,7 @@ describe('休眠条件逐个进出', () => {
 
     actions.收窄()
     await expect.poll(() => textEl.style.color).toBe('')
+    expect(shown(layerEl)).toBe(false)
     await expectFrozen(fake.log.frames)
   })
 
@@ -222,11 +237,13 @@ describe('休眠条件逐个进出', () => {
 
     lose.loseContext()
     await expect.poll(painted).toBe('')
+    expect(shown()).toBe(false)
     await expectFrozen(log.frames)
     const before = log.calls.length
 
     lose.restoreContext()
     await expect.poll(painted).toBe('transparent')
+    expect(shown()).toBe(true)
     expect(log.calls.slice(before, before + 4)).toEqual(['dispose', 'setup', 'build', 'frame'])
   })
 })
@@ -319,6 +336,7 @@ describe('熔断', () => {
     if (hook === 'build')
       target.textEl.textContent = 'Hubery Yang'
     await expect.poll(painted).toBe('')
+    expect(shown()).toBe(false)
     await expectFrozen(log.frames)
     expect(error).toHaveBeenCalledTimes(1)
     expect(log.calls.at(-1)).toBe('dispose')

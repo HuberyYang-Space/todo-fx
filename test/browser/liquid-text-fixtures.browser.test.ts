@@ -54,10 +54,13 @@ describe('宿主场景夹具', () => {
   const evicted: Record<string, number[]> = { chromium: [0, 1], firefox: [], webkit: [0, 1] }
 
   it('many-instances：超出上下文上限被挤掉的实例显示真文本，其余接管', async () => {
-    const { colors } = mount(manyInstances)
+    const { targets, colors } = mount(manyInstances)
     const expected = colors().map((_, i) => evicted[server.browser]!.includes(i) ? '' : 'transparent')
     await expect.poll(colors).toEqual(expected)
     await nextFrames(10)
     expect(colors()).toEqual(expected)
+    // 被挤掉的画布在 Chromium 里会画成不透明白块，必须藏起来，否则真文本被盖住
+    const shown = targets.map(({ layerEl }) => getComputedStyle(layerEl.querySelector('canvas')!).visibility === 'visible')
+    expect(shown).toEqual(expected.map(c => c === 'transparent'))
   })
 })

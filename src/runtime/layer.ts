@@ -10,8 +10,9 @@ export function createCanvas(layerEl: HTMLElement): HTMLCanvasElement {
   canvas.setAttribute('aria-hidden', 'true')
   // max-width: none：宿主 reset 常把 canvas 和 img 一起纳入 max-width: 100%，而这块画布刻意比容器宽
   // （四周留 padding 给流动溢出），被压回容器宽度、高度却不变，纹理就横向压扁，字又小又偏左。
-  // 全用 inline style：库不发 CSS 文件，inline 也压得过宿主 class
-  canvas.style.cssText = 'position: absolute; pointer-events: none; max-width: none;'
+  // 全用 inline style：库不发 CSS 文件，inline 也压得过宿主 class。
+  // 先藏着：画布与涂透明同进同退，由运行时在首帧画完后一起交接
+  canvas.style.cssText = 'position: absolute; pointer-events: none; max-width: none; visibility: hidden;'
   layerEl.append(canvas)
   return canvas
 }
