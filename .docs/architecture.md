@@ -209,7 +209,7 @@ Vue 壳的 props = `text` + `as` + 选项类型映射；props 变化时直接调
 | `runtime/`、`effects/` | import `vue`（及将来的 `react`） | 内核不得 import 任何框架 |
 | `runtime/` | import `ogl` | 只用 `particle-text` 的消费方不被运行时连带打包 ogl；与 `dist` 测试的产物断言互为双保险 |
 | `effects/*` | 特效之间互相 import | 特效之间只通过运行时共享 |
-| `vue/` | import 公开入口以外的任何内部路径 | 壳只能走公开内核 API |
+| `vue/` | import 公开入口以外的任何内部路径；经由包名 `@huberyyang/todo-fx` 自引用 | 壳只能走公开内核 API；包名自引用在 tsdown 构建时解析不到（`UNRESOLVED_IMPORT`），只能写 `'../index'` |
 | `runtime/` | import `effects/`、`vue/`、`index.ts` | runtime 借 `../effects/liquid-text` 就能把 ogl 间接拉进来，「runtime 不碰 ogl」会被绕开 |
 | `effects/*` | import `vue/`、`index.ts` | 依赖方向只有一条路（第一节） |
 | `index.ts` | import 框架；引用 `./vue` | 公开入口 `.` 不能把壳带进来 |

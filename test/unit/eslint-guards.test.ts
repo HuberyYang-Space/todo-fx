@@ -41,6 +41,7 @@ const RUNTIME_DOWN = 'runtime/ 只能向下依赖 compute/'
 const SIBLING = '特效之间不得互相 import'
 const EFFECT_DOWN = '特效只能向下依赖 runtime/ 与 compute/'
 const SHELL = '壳只能经由公开入口'
+const SHELL_SELF = '壳不得经由包名引用内核'
 const INDEX_NO_SHELL = '公开入口 . 不得引用 Vue 壳'
 
 describe('compute/：不 import 其他层，不碰 DOM 全局', () => {
@@ -146,13 +147,14 @@ describe('vue/：只能 import 公开入口', () => {
     [file, `import '../compute/params'`, 'no-restricted-imports', SHELL],
     [file, `import '..'`, 'no-restricted-imports', SHELL],
     ['src/vue/LiquidText.vue', `<script setup lang="ts">\nimport '../runtime/loop'\n</script>\n`, 'no-restricted-imports', SHELL],
+    [file, `import { createLiquidText } from '@huberyyang/todo-fx'\nexport const c = createLiquidText`, 'no-restricted-imports', SHELL_SELF],
+    [file, `import '@huberyyang/todo-fx/vue'`, 'no-restricted-imports', SHELL_SELF],
   ])('%s 拦住 %s', expectBlocked)
 
   it.each<Allowed>([
     [file, `import { createLiquidText } from '../index'\nexport const c = createLiquidText`],
     [file, `import { h } from 'vue'\nexport const v = h`],
     [file, `import './index'`],
-    [file, `import '@huberyyang/todo-fx'`],
   ])('%s 放行 %s', expectAllowed)
 })
 

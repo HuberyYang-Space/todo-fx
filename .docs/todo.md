@@ -53,9 +53,9 @@ CI 全绿：dev 上 run 35950631877、main 上 run 35951134904）。**下面的�
   （changelogithub 走环境变量里的 token 调 API，不需要 git 凭据）。2026-10-12 已修（changelogithub 15.0.5 的 git 子命令只有本地读操作）；运行时证据要等第一次发版
 - [x] **两个零消费方的脚本**：[`package.json`](../package.json) 的 `dev`（`tsdown --watch`，playground 的 alias 指向 `src`，没有东西读 watch 产物）与
   `commitlint`（钩子直接 `pnpm exec commitlint`，不经过它）。按「零消费方一律删除」删掉，README 命令表与 CLAUDE.md 若提到要同步（2026-10-12 已删；README 与 CLAUDE.md 本来就没提）
-- [ ] **lint 守卫放行了一条构建不通的路**：[`test/unit/eslint-guards.test.ts`](../test/unit/eslint-guards.test.ts) 放行 `src/vue/` 里
+- [x] **lint 守卫放行了一条构建不通的路**：[`test/unit/eslint-guards.test.ts`](../test/unit/eslint-guards.test.ts) 放行 `src/vue/` 里
   `import '@huberyyang/todo-fx'`，但终审实测 tsdown 构建这种写法报 `UNRESOLVED_IMPORT`。把 vue 项的包名自引用改为拦截（提示指向 `'../index'`），
-  放行用例改成拦截用例，并照例变异验证
+  放行用例改成拦截用例，并照例变异验证（2026-10-12 已修：先复现构建失败，新用例先红后绿，删规则变异后恰好这 2 条红）
 - [ ] **CI 里 Firefox 用 headed 是否必需**：CI 实测 headless 的 firefox-touch 在 xvfb 下也建得出 WebGL（run 35950071354），默认 Firefox instance 的
   `headless: !process.env.CI` 可能不必要。在 CI 上去掉它（Firefox 全部 headless、仍在 `xvfb-run` 下）看探针；再试一次不套 `xvfb-run`，
   确定到底是 headed 还是 display 在起作用，据此简化配置并改正 [`tech-stack.md`](tech-stack.md) 第六、九节与 [`vitest.config.ts`](../vitest.config.ts) 的注释
