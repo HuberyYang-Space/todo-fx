@@ -57,6 +57,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps --only-shell chromium firefox webkit
       - run: pnpm typecheck
       - run: pnpm lint
+      # xvfb-run 给 Firefox 提供 display，理由同 ci.yml 的 browser job
       - run: xvfb-run -a pnpm test
 
       # 锁大版本：不锁的 dlx 会让上游的破坏性更新在最要紧的时候搞挂发版

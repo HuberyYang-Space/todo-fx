@@ -55,7 +55,8 @@ jobs:
       # 不缓存浏览器：Playwright 官方不推荐，恢复与下载耗时相当，系统依赖本来就缓存不了。
       # --only-shell 只影响 Chromium：无头模式只用得到 headless shell
       - run: pnpm exec playwright install --with-deps --only-shell chromium firefox webkit
-      # Firefox 在 CI 里以 headed 模式运行（headless 在 Linux 上建不出 WebGL），由 xvfb-run 提供 display
+      # 三个内核都是 headless，但 Linux 上 headless 的 Firefox 没有 display 就建不出 WebGL（Canvas 2D 不受影响），
+      # Chromium、WebKit 不需要（CI 实测 run 38187560274）。xvfb-run 只为 Firefox 提供 display
       - run: xvfb-run -a pnpm test --project browser
 
   min-peer:

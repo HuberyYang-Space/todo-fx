@@ -1,4 +1,3 @@
-import process from 'node:process'
 import vue from '@vitejs/plugin-vue'
 import { playwright } from '@vitest/browser-playwright'
 import { defineConfig } from 'vitest/config'
@@ -6,10 +5,6 @@ import * as commands from './test/browser/commands.ts'
 
 // Playwright 1.63 启动 Chromium 时已默认追加这个开关；显式写上，不把 CI 里 WebGL 能否创建押在上游默认值上
 const chromiumArgs = ['--enable-unsafe-swiftshader']
-
-// 外部报告（Mozilla bug 1375585）说 Linux 上 headless Firefox 建不出 WebGL，CI 里按此改 headed，由 xvfb-run 提供 display。
-// 但 CI 实测 headless 的 firefox-touch 在 xvfb 下也建得出，headed 是否必需待证（tech-stack 第六节）；本地 macOS 不必弹窗
-const firefoxHeadless = !process.env.CI
 
 // hover: none 只能靠 contextOptions.hasTouch 仿真，contextOptions 又只能按 instance 配，
 // 所以每个内核多一个只跑 *.touch.test.ts 的 instance。instance 级的 provider 整体覆盖父级、不合并，选项要写全。
@@ -44,7 +39,7 @@ export default defineConfig({
             commands,
             instances: [
               { browser: 'chromium', provider: playwright({ launchOptions: { args: chromiumArgs } }) },
-              { browser: 'firefox', headless: firefoxHeadless },
+              { browser: 'firefox' },
               { browser: 'webkit' },
               {
                 browser: 'chromium',
