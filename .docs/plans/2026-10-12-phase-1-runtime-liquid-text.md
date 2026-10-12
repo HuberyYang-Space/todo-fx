@@ -46,6 +46,9 @@ my-blog 的 [`HeroTitle.vue`](https://github.com/HuberyYang-Space/my-blog/blob/2
      首帧交接前查 `isContextLost()`（d2fe8e5）。竞态的夹具测试依赖机器负载（单跑 WebKit 抓不到），另补一条在祖先捕获阶段拦下 lost 事件的确定性测试（两内核变异均红）。
    - Minor 记入 [`todo.md`](../todo.md)「阶段 1 遗留问题」。
    - 修完本地门禁 30 个文件 308 条全过；原有的运行时 38 条、液态版 9 条变异重跑仍全红。
+9. **推送后 CI 的 Linux WebKit 红了一次**（run 38211998163）：transform 那条测试数到了多出来的一次 build。根因是终审 Minor 里的「开播后 ResizeObserver 首次回调再建一次」，
+   慢机器上它晚于首帧到达，被算进了被测操作。本地把 ResizeObserver 回调推迟 150ms 复现（另一条计数测试同样红），于是不再当 Minor 延后：
+   watcher 比对尺寸、没变就不算信号；先写「开播只建一次」的测试见红再修，推迟回调的复现随之全绿；首次 build 定位的变异不再被掩盖，直接红在两条测试上。
 
 ## 需要 Hubery 拍板的事
 

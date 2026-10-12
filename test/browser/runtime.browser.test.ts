@@ -343,6 +343,16 @@ describe('重建', () => {
     expect(log.frameTimes[index + 1]).toBe(log.frameTimes[index])
   })
 
+  it('开播后不会因为 ResizeObserver 的首次回调再建一次纹理', async () => {
+    const { log } = start({ debug: true })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await expect.poll(painted).toBe('transparent')
+    await nextFrames(10)
+    // 首次回调报告的尺寸就是开播时量过的那个，没有变化不该重建；多建一次还会让 debug 日志误导排查
+    expect(log.calls.filter(c => c === 'build')).toHaveLength(1)
+    expect(warn).not.toHaveBeenCalled()
+  })
+
   it.for(['resize', 'fonts'] as const)('%s 信号触发重建', async (source) => {
     const { log } = start({ debug: true })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})

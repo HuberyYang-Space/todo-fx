@@ -9,9 +9,20 @@ export function watchRebuild(textEl: HTMLElement, onSignal: (source: RebuildSour
   const onResize = (): void => onSignal('resize')
   window.addEventListener('resize', onResize, { passive: true })
 
-  // 挂在父元素上：ResizeObserver 规范跳过 display: inline 的非替换元素，挂在 span 上等于没挂
-  const resizeObserver = new ResizeObserver(() => onSignal('ResizeObserver'))
-  resizeObserver.observe(textEl.parentElement ?? textEl)
+  // 挂在父元素上：ResizeObserver 规范跳过 display: inline 的非替换元素，挂在 span 上等于没挂。
+  // 首次回调总会来一次，报告的是开播时已经量过的尺寸：尺寸没变就不算信号，否则每次开播都多建一次纹理
+  const observed = textEl.parentElement ?? textEl
+  const initial = observed.getBoundingClientRect()
+  let lastSize = `${initial.width}x${initial.height}`
+  const resizeObserver = new ResizeObserver(([entry]) => {
+    const box = entry?.borderBoxSize[0]
+    const size = box ? `${box.inlineSize}x${box.blockSize}` : ''
+    if (size === lastSize)
+      return
+    lastSize = size
+    onSignal('ResizeObserver')
+  })
+  resizeObserver.observe(observed)
 
   // devicePixelRatio 没有变化事件：给当前值建一个媒体查询，它失配的那一刻就是 dpr 变了；
   // 查询钉死在具体数值上，变了之后要按新值重建一个

@@ -102,8 +102,6 @@ CI 全绿：dev 上 run 38195756526）。内核判据由自动化测试覆盖（
 - [ ] **手感对照**：Hubery 并排打开 `pnpm play` 与 my-blog 首页，按 [计划任务 7 的清单](plans/2026-10-12-phase-1-runtime-liquid-text.md) 逐项看；重点是关掉混合后的边缘粗细
 - [ ] **恢复后的首帧带着休眠期间的指针事件**：[`src/runtime/pointer.ts`](../src/runtime/pointer.ts) 的 `moved` 在休眠中照样累积，恢复首帧 `moved: true`、
   速度可达 9000（终审实测），可能在恢复瞬间打出一笔笔触。恢复时重置一次指针状态
-- [ ] **每次开播多建一次纹理**：ResizeObserver 的首次回调让第二帧再 build 一次（调用序列 `setup, build, frame, build, frame`），
-  debug 日志每次都打「重建：ResizeObserver」，排查时会误导。忽略首次回调或比对尺寸后再触发；注意它目前掩盖着「首次 build 时定位」这类错误，改完要重跑那条变异
 - [ ] **斜体不进纹理**：[`src/runtime/text-raster.ts`](../src/runtime/text-raster.ts) 的 font 简写只拼 `weight size family`。终审建议把 `fontStyle` 映射成 `italic` / `oblique`（丢掉角度），避开整条 font 赋值失效的风险
 - [ ] **根元素没有定位上下文时差一个 body margin**：`offsetParent` 退回 body，画布实际按初始包含块定位。判断基准的 `position` 是否为 `static`，是就按文档原点算；或在 README 写明要求
 - [ ] **上下文恢复时 `setup` 抛错，旧 hooks 的 `dispose` 被调两次**（[`src/runtime/define-effect.ts`](../src/runtime/define-effect.ts) 恢复处一次、熔断里一次）：被吞掉、无害，但不该发生
